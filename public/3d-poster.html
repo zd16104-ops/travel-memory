@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>旅行记忆 · 3D 轨迹视觉海报</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🏔️</text></svg>">
+
+<!-- 字体（与主站一致） -->
+<link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
+<!-- JSZip：解压 KMZ / 可选打包 -->
+<script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
+<!-- Coloris 调色盘（本地，与主站共用） -->
+<link rel="stylesheet" href="/coloris.min.css" />
+<script src="/coloris.min.js"></script>
+
+<style>
+:root { --accent-warm:#fb923c; }
+* { box-sizing:border-box; margin:0; padding:0; }
+/* ============ 顶部导航条 ============ */
+.top-nav {
+  position:fixed; top:0; left:0; right:0; z-index:1000;
+  display:flex; align-items:center; justify-content:center; gap:6px;
+  padding:9px 20px;
+  background:rgba(18,18,18,0.55);
+  backdrop-filter:blur(20px) saturate(180%);
+  -webkit-backdrop-filter:blur(20px) saturate(180%);
+  border-bottom:1px solid rgba(255,255,255,0.08);
+}
+.top-nav a {
+  color:rgba(255,252,248,0.62); text-decoration:none;
+  font-size:12.5px; font-weight:600; padding:5px 14px;
+  border-radius:18px; transition:all 0.2s; letter-spacing:0.3px;
+}
+.top-nav a:hover { color:rgba(255,252,248,0.95); background:rgba(255,255,255,0.07); }
+.top-nav a.active { color:#fb923c; background:rgba(251,146,60,0.12); }
+body {
+  background:url('/bg.webp') center/cover fixed, #0b0d12;
+  color:rgba(255,252,248,0.98);
+  font-family:'Nunito','PingFang SC','Microsoft YaHei',sans-serif;
+  min-height:100vh; -webkit-font-smoothing:antialiased;
+  padding:70px 20px 60px;
+}
+.page { max-width:1080px; margin:0 auto; }
+.page-head { text-align:center; margin-bottom:24px; }
+.page-head h1 {
+  font-size:26px; font-weight:800; letter-spacing:.5px;
+  display:inline-flex; align-items:center; gap:10px;
+}
+.page-head h1 .badge {
+  font-size:12px; font-weight:700; padding:3px 9px; border-radius:20px;
+  background:linear-gradient(135deg,#fb923c,#f472b6); color:#1a1014;
+}
+.page-head p { color:rgba(255,252,248,0.55); font-size:13px; margin-top:8px; }
+#app { margin-top:4px; }
+.foot { text-align:center; color:rgba(255,252,248,0.4); font-size:12px; margin-top:36px; line-height:1.8; }
+.foot code { background:rgba(255,255,255,0.08); padding:2px 7px; border-radius:6px; }
+.foot .icp-link { display:inline-block; margin-top:8px; color:rgba(255,252,248,0.55); text-decoration:none; }
+.foot .icp-link:hover { color:rgba(255,252,248,0.9); text-decoration:underline; }
+.mobile-notice { display:none; margin:16px 0; padding:12px 14px; border-radius:12px;
+  background:rgba(18,18,18,0.72); border:1px solid rgba(251,146,60,0.38);
+  backdrop-filter:blur(16px); -webkit-backdrop-filter:blur(16px);
+  text-align:left; line-height:1.55; }
+.mobile-notice .icon { font-size:40px; margin-bottom:8px; }
+.mobile-notice h2 { font-size:16px; font-weight:800; color:#fb923c; }
+.mobile-notice p { font-size:13px; color:rgba(255,252,248,0.65); }
+@media(max-width:767px){
+  body { padding:62px 12px 36px; background-attachment:scroll; }
+  .top-nav { justify-content:space-between; gap:2px; padding:6px 8px; }
+  .top-nav a { display:flex; align-items:center; justify-content:center; min-height:40px;
+    min-width:0; padding:7px 8px; font-size:11.5px; white-space:nowrap; }
+  .page-head { margin-bottom:14px; }
+  .page-head h1 { justify-content:center; flex-wrap:wrap; font-size:22px; line-height:1.25; }
+  .page-head p { padding:0 4px; font-size:12px; line-height:1.55; }
+  .mobile-notice { display:flex; align-items:center; gap:12px; }
+  .mobile-notice .icon { flex:0 0 auto; font-size:25px; margin:0; }
+  .mobile-notice h2 { font-size:14px; }
+  .mobile-notice p { font-size:12px; }
+  .foot { margin-top:20px; }
+  .foot-tech { display:none; }
+}
+@media(max-width:340px){
+  .top-nav a { padding-inline:6px; font-size:11px; }
+  .page-head h1 { font-size:20px; }
+}
+</style>
+</head>
+<body>
+<div class="top-nav">
+  <a href="/">🌴 旅行记忆</a>
+  <a href="/3d-poster.html" class="active">🏔️ 3D轨迹海报</a>
+</div>
+<div class="page">
+  <div class="page-head">
+    <h1>🏔️ 3D 轨迹视觉海报 <span class="badge">BETA</span></h1>
+    <p>上传 GPX / KML / KMZ 运动轨迹，手写 WebGL 实时渲染 3D 渐变幕墙，一键合成精致海报</p>
+  </div>
+
+  <div class="mobile-notice">
+    <div class="icon">📱</div>
+    <div>
+      <h2>手机端操作提示</h2>
+      <p>建议竖屏编辑；开启自动旋转后，可进入全屏录制画面。</p>
+    </div>
+  </div>
+
+  <!-- 独立功能模块的挂载点：不与主站图片模板功能共享任何状态 -->
+  <div id="app"></div>
+
+  <div class="foot">
+    <div class="foot-tech">
+      手写 Mercator 投影 · Catmull-Rom 插值 · mat4 透视相机 · TRIANGLE_STRIP 幕墙<br>
+      拖动滑块实时调整 <code>pitch / yaw / zoom / wallHeight / gradientPower</code>，点击「生成海报」导出 PNG
+    </div>
+    <a class="icp-link" href="https://beian.miit.gov.cn/" target="_blank" rel="noopener noreferrer">藏ICP备2026000768号-1</a>
+  </div>
+</div>
+
+<!-- Coloris 全局初始化（普通脚本，DOMContentLoaded 之前执行，确保单例 #clr-picker 容器先就绪；
+     用事件委托 [data-coloris] 支持模块后续动态插入的颜色输入框） -->
+<script>
+  Coloris({
+    el: '[data-coloris]',
+    theme: 'large', themeMode: 'dark', alpha: false, format: 'hex',
+    focusInput: false, selectInput: false, margin: 4,
+    swatches: ['#fb923c', '#f472b6', '#4ade80', '#60a5fa', '#a78bfa', '#ffd700', '#ffffff', '#ff5252'],
+  });
+</script>
+
+<script type="module">
+  import { ThreeDTrackPoster } from './js/modules/threeDTrackPoster.js';
+  // 等字体/依赖就绪后挂载
+  const app = new ThreeDTrackPoster(document.getElementById('app'));
+  app.init();
+  // 暴露到 window 仅用于调试，不影响主站
+  window.__t3d = app;
+</script>
+</body>
+</html>

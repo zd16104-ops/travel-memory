@@ -1,0 +1,18 @@
+{
+  "name": "lv-travel-grid",
+  "version": "1.0.0",
+  "description": "旅行记忆：上传照片与运动轨迹，生成九宫格和 3D 轨迹视觉海报。",
+  "main": "server.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "start": "node server.js"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "dependencies": {
+    "sql.js": "^1.12.0",
+    "express": "^5.2.1"
+  }
+}

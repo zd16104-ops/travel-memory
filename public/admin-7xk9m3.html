@@ -1,0 +1,1155 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>旅行记忆 · 管理后台</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🌴</text></svg>">
+<style>
+:root,
+body.theme-dark {
+  --body-bg: #0b0f15;
+  --glass-bg: rgba(18,18,18,0.48);
+  --glass-border: rgba(255,255,255,0.09);
+  --text-main: rgba(255,255,255,0.93);
+  --text-sub: rgba(255,255,255,0.58);
+  --text-muted: rgba(255,255,255,0.32);
+  --accent: #4ade80;
+  --accent-warm: #fb923c;
+  --accent-blue: #60a5fa;
+  --accent-pink: #f472b6;
+}
+
+body.theme-light {
+  --body-bg: #f0f2f5;
+  --glass-bg: rgba(255,255,255,0.70);
+  --glass-border: rgba(0,0,0,0.08);
+  --text-main: rgba(0,0,0,0.88);
+  --text-sub: rgba(0,0,0,0.55);
+  --text-muted: rgba(0,0,0,0.30);
+  --accent: #16a34a;
+  --accent-warm: #ea580c;
+  --accent-blue: #2563eb;
+  --accent-pink: #db2777;
+}
+
+body.theme-warm {
+  --body-bg: #1a1410;
+  --glass-bg: rgba(30,24,18,0.55);
+  --glass-border: rgba(255,200,120,0.10);
+  --text-main: rgba(255,245,230,0.93);
+  --text-sub: rgba(255,245,230,0.62);
+  --text-muted: rgba(255,245,230,0.38);
+  --accent: #86efac;
+  --accent-warm: #fbbf24;
+  --accent-blue: #93c5fd;
+  --accent-pink: #f9a8d4;
+}
+
+body.theme-green {
+  --body-bg: #f5f7ef;
+  --glass-bg: rgba(255,255,255,0.75);
+  --glass-border: rgba(0,0,0,0.06);
+  --text-main: rgba(40,48,24,0.90);
+  --text-sub: rgba(40,48,24,0.55);
+  --text-muted: rgba(40,48,24,0.32);
+  --accent: #8a9a5e;
+  --accent-warm: #c7862e;
+  --accent-blue: #4a7cb5;
+  --accent-pink: #b55070;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+/* ============ 顶部导航条 ============ */
+.top-nav {
+  position: fixed; top: 0; left: 0; right: 0; z-index: 1000;
+  display: flex; align-items: center; justify-content: center; gap: 6px;
+  padding: 9px 20px;
+  background: rgba(18,18,18,0.55);
+  backdrop-filter: blur(20px) saturate(180%);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
+  border-bottom: 1px solid rgba(255,255,255,0.08);
+}
+.top-nav a {
+  color: rgba(255,252,248,0.62); text-decoration: none;
+  font-size: 12.5px; font-weight: 600; padding: 5px 14px;
+  border-radius: 18px; transition: all 0.2s; letter-spacing: 0.3px;
+}
+.top-nav a:hover { color: rgba(255,252,248,0.95); background: rgba(255,255,255,0.07); }
+
+body {
+  background: var(--body-bg);
+  color: var(--text-main);
+  font-family: 'Segoe UI','PingFang SC','Microsoft YaHei',sans-serif;
+  min-height: 100vh;
+  display: flex; align-items: flex-start; justify-content: center;
+  padding: 70px 16px 60px;
+}
+
+.container {
+  width: 100%; max-width: 720px;
+  display: flex; flex-direction: column; gap: 12px;
+}
+
+.glass {
+  background: var(--glass-bg);
+  backdrop-filter: blur(18px) saturate(170%);
+  -webkit-backdrop-filter: blur(18px) saturate(170%);
+  border: 1px solid var(--glass-border);
+  border-radius: 16px;
+  box-shadow: 0 6px 24px rgba(0,0,0,0.30), inset 0 1px 0 rgba(255,255,255,0.03);
+  padding: 16px;
+}
+
+/* 登录 */
+.login-panel { text-align: center; }
+.login-panel h2 { font-size: 1.15rem; font-weight: 700; margin-bottom: 3px; }
+.login-sub { font-size: 0.73rem; color: var(--text-muted); margin-bottom: 14px; }
+.login-panel input {
+  width: 100%; padding: 10px 16px; border-radius: 10px;
+  border: 1.5px solid rgba(255,255,255,0.10); background: rgba(255,255,255,0.05);
+  color: var(--text-main); font-size: 0.88rem; text-align: center;
+  font-family: inherit; outline: none; margin-bottom: 8px;
+}
+.login-panel input:focus { border-color: rgba(96,165,250,0.45); }
+.login-error { font-size: 0.72rem; color: #ef4444; min-height: 18px; margin-bottom: 3px; }
+
+/* 头部 */
+.stats-header { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px; }
+.stats-header h2 { font-size: 1.05rem; font-weight: 700; }
+.tab-row { display: flex; gap: 6px; margin-top: 8px; }
+.tab-btn {
+  padding: 4px 12px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.08);
+  background: rgba(255,255,255,0.03); color: var(--text-sub); cursor: pointer;
+  font-size: 0.7rem; font-family: inherit; transition: all 0.15s;
+}
+.tab-btn.active { background: rgba(96,165,250,0.15); border-color: rgba(96,165,250,0.3); color: var(--accent-blue); }
+.tab-btn:hover { background: rgba(255,255,255,0.06); }
+
+.theme-switcher { display: flex; gap: 2px; }
+.theme-dot {
+  width: 18px; height: 18px; border-radius: 50%; cursor: pointer; border: 2px solid transparent;
+  transition: all 0.15s;
+}
+.theme-dot:hover { transform: scale(1.2); }
+.theme-dot.active { border-color: var(--text-main); }
+.theme-dot.dark { background: #1a1a2e; }
+.theme-dot.light { background: #e8e8e8; }
+.theme-dot.warm { background: #f5c542; }
+.theme-dot.green { background: #c5cf9b; }
+
+.refresh-info { font-size: 0.68rem; color: var(--text-muted); }
+.btn-sm {
+  padding: 4px 10px; border-radius: 7px; border: 1px solid rgba(255,255,255,0.10);
+  background: rgba(255,255,255,0.04); color: var(--text-sub); cursor: pointer;
+  font-size: 0.7rem; font-family: inherit;
+}
+.btn-sm:hover { background: rgba(255,255,255,0.10); color: var(--text-main); }
+
+/* 指标卡片 */
+.cards { display: grid; grid-template-columns: repeat(4,1fr); gap: 8px; }
+.card {
+  text-align: center; padding: 12px 6px; border-radius: 12px;
+  background: rgba(255,255,255,0.025); border: 1px solid rgba(255,255,255,0.05);
+}
+.card-value { font-size: 1.5rem; font-weight: 800; letter-spacing: -0.02em; line-height: 1.15; }
+.card-label { font-size: 0.66rem; color: var(--text-muted); margin-top: 1px; }
+.card.pv .card-value { color: var(--accent-blue); }
+.card.uv .card-value { color: var(--accent); }
+.card.dl .card-value { color: var(--accent-warm); }
+.card.dur .card-value { color: rgba(255,255,255,0.90); }
+
+/* 趋势图 */
+.trend-grid { display: grid; grid-template-columns: repeat(2,1fr); gap: 10px; }
+@media (max-width: 560px) { .trend-grid { grid-template-columns: 1fr; } }
+.trend-box h4 {
+  font-size: 0.75rem; font-weight: 700; margin-bottom: 8px; text-align: center;
+}
+.trend-bars { display: flex; align-items: flex-end; gap: 4px; height: 100px; padding: 0 2px; }
+.trend-bar-wrap { flex: 1; display: flex; flex-direction: column; align-items: center; height: 100%; justify-content: flex-end; }
+.trend-bar { width: 100%; max-width: 44px; border-radius: 3px 3px 0 0; min-height: 2px; transition: height 0.35s ease; }
+.trend-bar.pv-color { background: linear-gradient(180deg, var(--accent-blue), rgba(96,165,250,0.15)); }
+.trend-bar.uv-color { background: linear-gradient(180deg, var(--accent), rgba(74,222,128,0.15)); }
+.trend-bar.dl-color { background: linear-gradient(180deg, var(--accent-warm), rgba(251,146,60,0.15)); }
+.trend-bar.dur-color { background: linear-gradient(180deg, var(--accent-pink), rgba(244,114,182,0.15)); }
+.trend-val { font-size: 0.6rem; color: var(--text-sub); margin-bottom: 2px; font-weight: 600; }
+.trend-day { font-size: 0.58rem; color: var(--text-muted); margin-top: 3px; }
+
+/* 兑换码管理 */
+.code-section h3 { font-size: 0.9rem; font-weight: 700; margin-bottom: 10px; }
+.gen-row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-bottom: 10px; }
+.gen-row input { width: 60px; padding: 5px 8px; border-radius: 7px; border: 1px solid rgba(255,255,255,0.10); background: rgba(255,255,255,0.05); color: var(--text-main); font-size: 0.75rem; text-align: center; font-family: inherit; outline: none; }
+.gen-row input:focus { border-color: rgba(74,222,128,0.4); }
+.code-list { max-height: 200px; overflow-y: auto; }
+.code-row {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 6px 10px; border-radius: 8px; margin-bottom: 3px;
+  background: rgba(255,255,255,0.025); border: 1px solid rgba(255,255,255,0.04);
+  font-family: 'Cascadia Code','SF Mono',monospace; font-size: 0.78rem;
+}
+.code-row .copy-btn {
+  padding: 2px 8px; border-radius: 5px; border: 1px solid rgba(255,255,255,0.08);
+  background: rgba(255,255,255,0.04); color: var(--text-sub); cursor: pointer;
+  font-size: 0.65rem; font-family: inherit;
+}
+.code-row .copy-btn:hover { background: rgba(74,222,128,0.15); border-color: rgba(74,222,128,0.3); color: var(--accent); }
+.code-row .copy-btn.copied { background: rgba(74,222,128,0.2); color: var(--accent); }
+.code-msg { font-size: 0.7rem; min-height: 18px; margin-top: 4px; }
+.code-msg.ok { color: var(--accent); }
+.code-msg.err { color: #ef4444; }
+
+/* 投稿列表 */
+.sub-list-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+}
+@media (max-width: 768px) { .sub-list-grid { grid-template-columns: repeat(2, 1fr); } }
+@media (max-width: 480px) { .sub-list-grid { grid-template-columns: 1fr; } }
+
+.sub-card {
+  background: var(--glass-bg);
+  backdrop-filter: blur(18px) saturate(170%);
+  -webkit-backdrop-filter: blur(18px) saturate(170%);
+  border: 1px solid var(--glass-border);
+  border-radius: 14px;
+  padding: 12px;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.25);
+}
+.sub-card h4 { font-size: 0.78rem; font-weight: 700; margin-bottom: 4px; color: var(--accent-warm); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sub-card .sub-desc { font-size: 0.68rem; color: var(--text-sub); line-height: 1.4; margin-bottom: 6px; }
+.sub-card .sub-meta { font-size: 0.6rem; color: var(--text-muted); margin-bottom: 6px; }
+.sub-preview {
+  display: grid; grid-template-columns: repeat(3,1fr); gap: 2px;
+  max-width: 100%; margin-bottom: 6px; border-radius: 6px; overflow: hidden;
+}
+.sub-preview img { width: 100%; aspect-ratio: 1; object-fit: cover; background: rgba(255,255,255,0.06); }
+.sub-full-preview img { width: 100%; max-width: 300px; border-radius: 8px; margin-bottom: 8px; }
+.sub-actions { display: flex; gap: 6px; flex-wrap: wrap; }
+.btn-approve {
+  padding: 4px 12px; border-radius: 7px; border: 1px solid rgba(74,222,128,0.3);
+  background: rgba(74,222,128,0.12); color: var(--accent); cursor: pointer;
+  font-size: 0.68rem; font-family: inherit;
+}
+.btn-approve:hover { background: rgba(74,222,128,0.25); }
+.btn-reject {
+  padding: 4px 12px; border-radius: 7px; border: 1px solid rgba(239,68,68,0.3);
+  background: rgba(239,68,68,0.08); color: #ef4444; cursor: pointer;
+  font-size: 0.68rem; font-family: inherit;
+}
+.btn-reject:hover { background: rgba(239,68,68,0.18); }
+.sub-status {
+  font-size: 0.65rem; padding: 2px 8px; border-radius: 5px;
+  font-weight: 600; display: inline-block;
+}
+.sub-status.pending { background: rgba(251,146,60,0.12); color: var(--accent-warm); }
+.sub-status.approved { background: rgba(74,222,128,0.12); color: var(--accent); }
+.sub-status.rejected { background: rgba(239,68,68,0.10); color: #ef4444; }
+
+/* 累计 */
+.total-line { text-align: center; font-size: 0.7rem; color: var(--text-sub); padding-top: 4px; border-top: 1px solid rgba(255,255,255,0.04); display: flex; gap: 16px; justify-content: center; flex-wrap: wrap; }
+
+/* 模板管理 4 列网格 */
+.tpl-grid-4 { grid-template-columns: repeat(4, 1fr) !important; }
+@media (max-width: 900px) { .tpl-grid-4 { grid-template-columns: repeat(3, 1fr) !important; } }
+@media (max-width: 640px) { .tpl-grid-4 { grid-template-columns: repeat(2, 1fr) !important; } }
+@media (max-width: 380px) { .tpl-grid-4 { grid-template-columns: 1fr !important; } }
+
+/* 路线距离徽章 */
+.tpl-dist {
+  display: inline-flex; align-items: center; gap: 3px;
+  font-size: 0.62rem; font-weight: 600; color: var(--accent-blue);
+  background: rgba(96,165,250,0.12); border: 1px solid rgba(96,165,250,0.20);
+  padding: 1px 7px; border-radius: 6px; margin-bottom: 6px;
+}
+.tpl-dist.unknown { color: var(--text-muted); background: rgba(255,255,255,0.04); border-color: rgba(255,255,255,0.06); }
+.tpl-cat-tag { font-size: 0.58rem; color: var(--text-muted); margin-left: 4px; }
+
+/* 上传分类下拉 */
+.cat-select {
+  padding: 5px 10px; border-radius: 7px; border: 1px solid rgba(255,255,255,0.10);
+  background: rgba(255,255,255,0.05); color: var(--text-main); font-size: 0.73rem;
+  font-family: inherit; outline: none; cursor: pointer;
+}
+.cat-select:focus { border-color: rgba(74,222,128,0.4); }
+
+/* 上传进度条 */
+.up-progress-wrap { margin: 6px 0; display: none; }
+.up-progress-wrap.show { display: block; }
+.up-progress-bar { height: 6px; border-radius: 3px; background: rgba(255,255,255,0.06); overflow: hidden; }
+.up-progress-fill { height: 100%; width: 0%; border-radius: 3px; background: linear-gradient(90deg, var(--accent), var(--accent-blue)); transition: width 0.3s ease; }
+.up-progress-txt { font-size: 0.66rem; color: var(--text-sub); margin-top: 4px; }
+
+/* 上传卡片状态 */
+.sub-card.uploading { border-color: rgba(96,165,250,0.4); box-shadow: 0 0 0 1px rgba(96,165,250,0.25); }
+.sub-card.done { border-color: rgba(74,222,128,0.45); box-shadow: 0 0 0 1px rgba(74,222,128,0.3); }
+.sub-card.failed { border-color: rgba(239,68,68,0.45); box-shadow: 0 0 0 1px rgba(239,68,68,0.3); }
+.up-state {
+  font-size: 0.6rem; font-weight: 600; padding: 2px 8px; border-radius: 5px; display: inline-block;
+}
+.up-state.wait { background: rgba(255,255,255,0.05); color: var(--text-muted); }
+.up-state.go { background: rgba(96,165,250,0.14); color: var(--accent-blue); }
+.up-state.ok { background: rgba(74,222,128,0.16); color: var(--accent); }
+.up-state.err { background: rgba(239,68,68,0.12); color: #ef4444; }
+.spin { display: inline-block; width: 9px; height: 9px; border: 2px solid rgba(96,165,250,0.3); border-top-color: var(--accent-blue); border-radius: 50%; animation: spin 0.7s linear infinite; vertical-align: -1px; margin-right: 3px; }
+@keyframes spin { to { transform: rotate(360deg); } }
+
+.hidden { display: none !important; }
+
+@media (max-width: 480px) {
+  .cards { grid-template-columns: repeat(2,1fr); gap: 6px; }
+  .card-value { font-size: 1.2rem; }
+  .trend-bars { height: 80px; }
+  .glass { padding: 12px; }
+  .gen-row { gap: 6px; }
+}
+</style>
+</head>
+<body>
+
+<div class="top-nav">
+  <a href="/">🌴 旅行记忆</a>
+  <a href="/3d-poster.html">🏔️ 3D轨迹海报</a>
+</div>
+
+<div class="container">
+
+  <!-- 登录 -->
+  <div class="glass login-panel" id="loginPanel">
+    <h2>📊 管理后台</h2>
+    <p class="login-sub">请输入管理密码</p>
+    <input type="password" id="pwdInput" placeholder="管理密码" onkeydown="if(event.key==='Enter')doLogin()">
+    <div class="login-error" id="loginError"></div>
+    <button style="padding:7px 18px;border-radius:9px;border:1px solid rgba(96,165,250,0.25);background:rgba(96,165,250,0.10);color:var(--accent-blue);cursor:pointer;font-size:0.8rem;font-family:inherit;" onclick="doLogin()">登录</button>
+  </div>
+
+  <!-- 统计面板 -->
+  <div class="hidden" id="statsPanel">
+    <div class="glass">
+      <div class="stats-header">
+        <h2>📊 数据看板</h2>
+        <span style="display:flex;align-items:center;gap:10px;">
+          <div class="theme-switcher" id="themeSwitcher">
+            <div class="theme-dot dark" data-theme="dark" title="深色"></div>
+            <div class="theme-dot light" data-theme="light" title="浅色"></div>
+            <div class="theme-dot warm" data-theme="warm" title="暖色"></div>
+            <div class="theme-dot green" data-theme="green" title="绿色"></div>
+          </div>
+          <span class="refresh-info" id="refreshInfo"></span>
+          <button class="btn-sm" onclick="loadStats()">刷新</button>
+          <button class="btn-sm" onclick="logout()">退出</button>
+        </span>
+      </div>
+      <div class="tab-row">
+        <button class="tab-btn active" onclick="switchTab('stats')">📊 统计</button>
+        <button class="tab-btn" onclick="switchTab('codes')">🎫 兑换码</button>
+        <button class="tab-btn" onclick="switchTab('subs')">📮 投稿</button>
+        <button class="tab-btn" onclick="switchTab('upload')">📤 上传路线</button>
+        <button class="tab-btn" onclick="switchTab('templates')">🗂 模板管理</button>
+      </div>
+    </div>
+
+    <!-- ===== 统计 Tab ===== -->
+    <div id="tabStats">
+      <div class="glass">
+        <div class="cards">
+          <div class="card pv"><div class="card-value" id="valPV">—</div><div class="card-label">今日 PV</div></div>
+          <div class="card uv"><div class="card-value" id="valUV">—</div><div class="card-label">今日 UV</div></div>
+          <div class="card dl"><div class="card-value" id="valDL">—</div><div class="card-label">今日下载</div></div>
+          <div class="card dur"><div class="card-value" id="valDur">—</div><div class="card-label">平均停留(s)</div></div>
+        </div>
+        <div class="cards" style="margin-top:8px;">
+          <div class="card pv"><div class="card-value" id="valAdminLogin">—</div><div class="card-label">登录(成功)</div></div>
+          <div class="card uv"><div class="card-value" id="valAdminLoginFail">—</div><div class="card-label">登录(失败)</div></div>
+          <div class="card dl"><div class="card-value" id="valRedeem">—</div><div class="card-label">兑换(成功)</div></div>
+          <div class="card dur"><div class="card-value" id="valRedeemFail">—</div><div class="card-label">兑换(失败)</div></div>
+        </div>
+      </div>
+
+      <div class="glass">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+          <h4 style="font-size:0.82rem;font-weight:700;margin:0;">📈 近 7 天趋势</h4>
+          <span style="font-size:0.62rem;color:var(--text-muted);">hover 查看详情</span>
+        </div>
+        <div class="trend-grid" id="trendGrid"></div>
+      </div>
+
+      <div class="glass" id="hourlySection" style="display:none;">
+        <h4 style="font-size:0.78rem;font-weight:700;margin-bottom:8px;text-align:center;">⏱ 今日每小时 PV</h4>
+        <div class="trend-bars" id="hourlyBars" style="height:80px;"></div>
+      </div>
+
+      <div class="glass">
+        <div class="total-line">
+          累计 PV：<strong id="valTotal" style="color:var(--accent-blue)">—</strong>
+          累计下载：<strong id="valTotalDL" style="color:var(--accent-warm)">—</strong>
+        </div>
+      </div>
+    </div>
+
+    <!-- ===== 兑换码 Tab ===== -->
+    <div id="tabCodes" class="hidden">
+      <div class="glass code-section">
+        <h3>🎫 兑换码管理</h3>
+        <div class="gen-row">
+          <label style="font-size:0.73rem;color:var(--text-sub);">生成数量：</label>
+          <input type="number" id="genCount" value="5" min="1" max="50">
+          <button class="btn-sm" style="background:rgba(74,222,128,0.12);border-color:rgba(74,222,128,0.25);color:var(--accent);" onclick="generateCodes()">生成兑换码</button>
+          <button class="btn-sm" onclick="loadAllCodes()">刷新列表</button>
+          <button class="btn-sm" style="background:rgba(251,146,60,0.10);border-color:rgba(251,146,60,0.2);color:var(--accent-warm);" onclick="copyAllCodes()">📋 复制未使用</button>
+          <button class="btn-sm" style="background:rgba(96,165,250,0.10);border-color:rgba(96,165,250,0.2);color:var(--accent-blue);" onclick="exportCodes()">📥 导出 Excel</button>
+        </div>
+        <div class="code-msg" id="codeMsg"></div>
+        <div class="code-list" id="codeList"></div>
+      </div>
+    </div>
+
+    <!-- ===== 投稿审核 Tab ===== -->
+    <div id="tabSubs" class="hidden">
+      <div class="glass" style="margin-bottom:10px;">
+        <div style="display:flex;justify-content:space-between;align-items:center;">
+          <h3 style="font-size:0.9rem;font-weight:700;margin:0;">📮 路线投稿审核</h3>
+          <button class="btn-sm" onclick="loadSubmissions()">刷新</button>
+        </div>
+      </div>
+      <div class="sub-list-grid" id="subList"></div>
+    </div>
+
+    <!-- ===== 模板管理 Tab ===== -->
+    <div id="tabTemplates" class="hidden">
+      <div class="glass" style="margin-bottom:10px;">
+        <div style="display:flex;justify-content:space-between;align-items:center;">
+          <h3 style="font-size:0.9rem;font-weight:700;margin:0;">🗂 模板管理</h3>
+          <button class="btn-sm" onclick="loadTemplateList()">刷新</button>
+        </div>
+      </div>
+      <div class="sub-list-grid tpl-grid-4" id="tplList"></div>
+    </div>
+
+    <!-- ===== 批量上传 Tab ===== -->
+    <div id="tabUpload" class="hidden">
+      <div class="glass" style="margin-bottom:10px;">
+        <h3 style="font-size:0.9rem;font-weight:700;margin:0;">📤 批量上传路线</h3>
+        <p style="font-size:0.7rem;color:var(--text-sub);margin-top:4px;">支持格式：<strong>GPX</strong> / <strong>KML</strong> / <strong>GeoJSON</strong> / <strong>TCX</strong>，可多选文件批量上传</p>
+        <p style="font-size:0.62rem;color:var(--text-muted);margin-top:2px;">你上传的路线及相关数据将归旅行记忆平台所有，平台有权对其进行展示、分发、修改及商业使用。</p>
+        <div style="margin-top:10px;display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+          <label style="font-size:0.72rem;color:var(--text-sub);">分类：</label>
+          <select id="uploadCategory" class="cat-select">
+            <option value="cycling">🚴 骑行</option>
+            <option value="hiking">🥾 徒步</option>
+            <option value="travel">🗺 旅游</option>
+          </select>
+          <input type="file" id="batchTrackInput" accept=".gpx,.kml,.geojson,.json,.tcx" multiple style="display:none;" onchange="handleBatchParse(event)">
+          <button class="btn-sm" style="background:rgba(74,222,128,0.12);border-color:rgba(74,222,128,0.25);color:var(--accent);" onclick="document.getElementById('batchTrackInput').click()">📁 选择文件</button>
+          <button class="btn-sm" style="background:rgba(251,146,60,0.10);border-color:rgba(251,146,60,0.2);color:var(--accent-warm);" onclick="uploadAllPending()" id="uploadAllBtn" disabled>🚀 全部上传到服务器</button>
+        </div>
+        <div class="up-progress-wrap" id="upProgress">
+          <div class="up-progress-bar"><div class="up-progress-fill" id="upProgressFill"></div></div>
+          <div class="up-progress-txt" id="upProgressTxt"></div>
+        </div>
+      </div>
+      <div id="uploadMsg" style="font-size:0.7rem;padding:6px 0;"></div>
+      <div class="sub-list-grid" id="uploadList"></div>
+    </div>
+  </div>
+
+</div>
+
+<script type="module">
+import Tracker from './js/modules/tracker.js';
+import './js/modules/trajectory-engine.js';
+window._tracker = new Tracker({ debug: false });
+</script>
+
+<script>
+let token = null;
+let pendingUploads = [];
+
+// ========== 登录 ==========
+function doLogin() {
+  const pwd = document.getElementById('pwdInput').value;
+  const err = document.getElementById('loginError');
+  if (!pwd) { err.textContent = '请输入密码'; return; }
+  err.textContent = '验证中...';
+  fetch('/api/admin/auth', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({password:pwd}) })
+    .then(r => r.json()).then(data => {
+      if (data.token) { token = data.token; sessionStorage.setItem('admin_token', token); showPanel(); loadStats(); }
+      else { err.textContent = data.error || '密码错误'; }
+    }).catch(() => { err.textContent = '网络错误'; });
+}
+
+function showPanel() {
+  document.getElementById('loginPanel').classList.add('hidden');
+  document.getElementById('statsPanel').classList.remove('hidden');
+}
+
+function logout() {
+  token = null; sessionStorage.removeItem('admin_token');
+  document.getElementById('loginPanel').classList.remove('hidden');
+  document.getElementById('statsPanel').classList.add('hidden');
+}
+
+// ========== Tab 切换 ==========
+function switchTab(tab) {
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById('tabStats').classList.add('hidden');
+  document.getElementById('tabCodes').classList.add('hidden');
+  document.getElementById('tabSubs').classList.add('hidden');
+  document.getElementById('tabUpload').classList.add('hidden');
+  document.getElementById('tabTemplates').classList.add('hidden');
+  if (tab === 'stats') {
+    document.querySelector('.tab-btn:nth-child(1)').classList.add('active');
+    document.getElementById('tabStats').classList.remove('hidden');
+  } else if (tab === 'codes') {
+    document.querySelector('.tab-btn:nth-child(2)').classList.add('active');
+    document.getElementById('tabCodes').classList.remove('hidden');
+    loadAllCodes();
+  } else if (tab === 'subs') {
+    document.querySelector('.tab-btn:nth-child(3)').classList.add('active');
+    document.getElementById('tabSubs').classList.remove('hidden');
+    loadSubmissions();
+  } else if (tab === 'upload') {
+    document.querySelector('.tab-btn:nth-child(4)').classList.add('active');
+    document.getElementById('tabUpload').classList.remove('hidden');
+  } else if (tab === 'templates') {
+    document.querySelector('.tab-btn:nth-child(5)').classList.add('active');
+    document.getElementById('tabTemplates').classList.remove('hidden');
+    loadTemplateList();
+  }
+}
+
+// ========== 数据加载 ==========
+function loadStats() {
+  document.getElementById('refreshInfo').textContent = '加载中...';
+  fetch('/api/admin/stats', { headers:{'Authorization':'Bearer '+token} })
+    .then(r => { if (r.status===401) { logout(); throw new Error('unauth'); } return r.json(); })
+    .then(data => {
+      document.getElementById('valPV').textContent = data.today.pv;
+      document.getElementById('valUV').textContent = data.today.uv;
+      document.getElementById('valDL').textContent = data.today.downloads;
+      document.getElementById('valDur').textContent = data.today.avgDurationSec || 0;
+      document.getElementById('valAdminLogin').textContent = data.today.adminLogin || 0;
+      document.getElementById('valAdminLoginFail').textContent = data.today.adminLoginFailed || 0;
+      document.getElementById('valRedeem').textContent = data.today.redeem || 0;
+      document.getElementById('valRedeemFail').textContent = data.today.redeemFailed || 0;
+      document.getElementById('valTotal').textContent = data.totalPV;
+      document.getElementById('valTotalDL').textContent = data.totalDL || 0;
+
+      // 4 个趋势图
+      renderTrendGrid(data.trends);
+
+      // 今日每小时
+      renderHourly(data.hourlyPV);
+
+      document.getElementById('refreshInfo').textContent = '更新于 '+new Date().toLocaleTimeString('zh-CN');
+    }).catch(e => { if (e.message!=='unauth') document.getElementById('refreshInfo').textContent = '加载失败'; });
+}
+
+function renderTrendGrid(trends) {
+  const grid = document.getElementById('trendGrid');
+  const configs = [
+    { key:'pv', title:'PV (页面访问)', color:'pv-color' },
+    { key:'uv', title:'UV (独立访客)', color:'uv-color' },
+    { key:'dl', title:'下载次数', color:'dl-color' },
+    { key:'dur', title:'平均停留(s)', color:'dur-color' },
+  ];
+  grid.innerHTML = configs.map(c => {
+    const data = trends[c.key] || [];
+    const maxCnt = Math.max(1, ...data.map(d => d.cnt));
+    const barsHTML = data.map(d => {
+      const h = Math.max(2, Math.round((d.cnt / maxCnt) * 100));
+      return `<div class="trend-bar-wrap">
+        <div class="trend-val">${d.cnt}</div>
+        <div class="trend-bar ${c.color}" style="height:${h}%" title="${d.dt}: ${d.cnt}"></div>
+        <div class="trend-day">${d.dt.slice(5)}</div>
+      </div>`;
+    }).join('');
+    return `<div class="trend-box"><h4>${c.title}</h4><div class="trend-bars">${barsHTML || '<span style="color:var(--text-muted);font-size:0.7rem;margin:auto;">暂无数据</span>'}</div></div>`;
+  }).join('');
+}
+
+function renderHourly(data) {
+  const sec = document.getElementById('hourlySection');
+  if (!data || data.length === 0) { sec.style.display = 'none'; return; }
+  sec.style.display = '';
+  const maxCnt = Math.max(1, ...data.map(d => d.cnt));
+  document.getElementById('hourlyBars').innerHTML = data.map(d => {
+    const h = Math.max(2, Math.round((d.cnt / maxCnt) * 100));
+    return `<div class="trend-bar-wrap">
+      <div class="trend-val">${d.cnt}</div>
+      <div class="trend-bar pv-color" style="height:${h}%" title="${d.hr}:00 - ${d.cnt} PV"></div>
+      <div class="trend-day">${d.hr}h</div>
+    </div>`;
+  }).join('');
+}
+
+// ========== 兑换码 ==========
+function loadAllCodes() {
+  const list = document.getElementById('codeList');
+  const msg = document.getElementById('codeMsg');
+  list.innerHTML = '<span style="color:var(--text-muted);font-size:0.72rem;">加载中...</span>';
+
+  fetch('/api/admin/codes', { headers:{'Authorization':'Bearer '+token} })
+    .then(r => { if (r.status===401) { logout(); throw new Error('unauth'); } return r.json(); })
+    .then(data => {
+      const unused = data.codes.filter(c => !c.used);
+      if (data.codes.length === 0) {
+        list.innerHTML = '<span style="color:var(--text-muted);font-size:0.72rem;">暂无兑换码，请先生成</span>';
+      } else {
+        list.innerHTML = data.codes.map(c => `
+          <div class="code-row" style="opacity:${c.used ? '0.4' : '1'}">
+            <span>${c.code}</span>
+            <span style="font-size:0.6rem;margin-right:8px;color:${c.used ? '#ef4444' : 'var(--accent)'}">${c.used ? '已使用' : '可用'}</span>
+            <button class="copy-btn" onclick="copyCode(this,'${c.code}')">复制</button>
+          </div>`).join('');
+      }
+      msg.textContent = `共 ${data.total} 个 · ${unused.length} 个未使用`;
+      msg.className = 'code-msg ok';
+    }).catch(e => {
+      if (e.message!=='unauth') { list.innerHTML = ''; msg.textContent = '加载失败'; msg.className = 'code-msg err'; }
+    });
+}
+
+function exportCodes() {
+  fetch('/api/admin/codes', { headers:{'Authorization':'Bearer '+token} })
+    .then(r => r.json())
+    .then(data => {
+      const unused = data.codes.filter(c => !c.used);
+      if (unused.length === 0) { alert('没有未使用的兑换码'); return; }
+      // CSV with BOM for Excel Chinese support
+      const BOM = '\uFEFF';
+      const csv = BOM + '兑换码,状态\n' + unused.map(c => c.code + ',未使用').join('\n');
+      const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = '兑换码_未使用.csv';
+      a.click();
+      URL.revokeObjectURL(a.href);
+      document.getElementById('codeMsg').textContent = `已导出 ${unused.length} 个未使用兑换码`;
+      document.getElementById('codeMsg').className = 'code-msg ok';
+    });
+}
+
+async function copyCode(btn, code) {
+  try {
+    await navigator.clipboard.writeText(code);
+    btn.textContent = '已复制!';
+    btn.classList.add('copied');
+    setTimeout(() => { btn.textContent = '复制'; btn.classList.remove('copied'); }, 1500);
+  } catch(e) {
+    // fallback
+    const ta = document.createElement('textarea');
+    ta.value = code; ta.style.position = 'fixed'; ta.style.opacity = '0';
+    document.body.appendChild(ta); ta.select();
+    document.execCommand('copy'); document.body.removeChild(ta);
+    btn.textContent = '已复制!';
+    btn.classList.add('copied');
+    setTimeout(() => { btn.textContent = '复制'; btn.classList.remove('copied'); }, 1500);
+  }
+}
+
+async function copyAllCodes() {
+  const rows = document.querySelectorAll('.code-row span');
+  if (rows.length === 0) { document.getElementById('codeMsg').textContent = '没有可复制的兑换码'; return; }
+  const all = Array.from(rows).map(s => s.textContent).join('\n');
+  await navigator.clipboard.writeText(all);
+  document.getElementById('codeMsg').textContent = `已复制 ${rows.length} 个兑换码到剪贴板`;
+  document.getElementById('codeMsg').className = 'code-msg ok';
+}
+
+function generateCodes() {
+  const count = parseInt(document.getElementById('genCount').value) || 5;
+  const msg = document.getElementById('codeMsg');
+  msg.textContent = '生成中...';
+  msg.className = 'code-msg';
+
+  fetch('/api/admin/generate', {
+    method:'POST',
+    headers:{'Content-Type':'application/json','Authorization':'Bearer '+token},
+    body:JSON.stringify({count}),
+  })
+    .then(r => { if (r.status===401) { logout(); throw new Error('unauth'); } return r.json(); })
+    .then(data => {
+      if (data.error) { msg.textContent = data.error; msg.className = 'code-msg err'; return; }
+      msg.textContent = `成功生成 ${data.total} 个兑换码`;
+      msg.className = 'code-msg ok';
+      loadAllCodes();
+    })
+    .catch(e => { if (e.message!=='unauth') { msg.textContent = '生成失败'; msg.className = 'code-msg err'; } });
+}
+
+// ========== 投稿审核 ==========
+function loadSubmissions() {
+  const list = document.getElementById('subList');
+  list.innerHTML = '<span style="color:var(--text-muted);font-size:0.72rem;">加载中...</span>';
+  fetch('/api/admin/submissions', { headers: { 'Authorization': 'Bearer ' + token } })
+    .then(r => { if (r.status === 401) { logout(); throw new Error('unauth'); } return r.json(); })
+    .then(data => {
+      if (!data.submissions || data.submissions.length === 0) {
+        list.innerHTML = '<div class="glass" style="text-align:center;padding:20px;color:var(--text-muted);font-size:0.8rem;">暂无投稿</div>';
+        return;
+      }
+      list.innerHTML = data.submissions.map(s => {
+        let actionsHtml = '<button class="btn-sm" onclick="renameTemplate(\'' + s.tkey + '\')">✏️ 改名</button>';
+        if (s.status === 'pending') {
+          actionsHtml += '<button class="btn-approve" onclick="reviewSubmission(\'' + s.id + '\',\'approved\')">✅ 通过并上线</button>';
+          actionsHtml += '<button class="btn-reject" onclick="reviewSubmission(\'' + s.id + '\',\'rejected\')">❌ 拒绝</button>';
+        } else {
+          actionsHtml += '<button class="btn-reject" onclick="deleteTemplate(\'' + (s.tkey || s.key) + '\')">🗑 删除</button>';
+        }
+        return '<div class="sub-card">'
+          + '<h4>' + escHtml(s.title) + ' <span class="sub-status ' + s.status + '">' + statusLabel(s.status) + '</span></h4>'
+          + '<div class="sub-desc">' + escHtml(s.description) + '</div>'
+          + '<div class="sub-meta">' + (s.created_at || '') + '</div>'
+          + '<div class="sub-preview">' + renderGridPreview(s.tkey) + '</div>'
+          + '<div class="sub-actions">' + actionsHtml + '</div>'
+          + '</div>';
+      }).join('');
+    }).catch(e => { if (e.message !== 'unauth') list.innerHTML = '<span style="color:#ef4444;">加载失败</span>'; });
+}
+
+function escHtml(s) {
+  const d = document.createElement('div');
+  d.textContent = s;
+  return d.innerHTML;
+}
+
+function templateFileUrl(key, fileName) {
+  return `/templates/${encodeURIComponent(key)}/${fileName}`;
+}
+
+function toTemplateFolderName(name) {
+  return String(name || '')
+    .trim()
+    .replace(/[<>:"/\\|?*\x00-\x1F]/g, '_')
+    .replace(/\s+/g, ' ')
+    .slice(0, 120)
+    .trim();
+}
+
+function nextTemplateKey(baseKey, existingKeys) {
+  if (!existingKeys.has(baseKey)) return baseKey;
+  for (let i = 2; i < 1000; i++) {
+    const key = `${baseKey}（${i}）`;
+    if (!existingKeys.has(key)) return key;
+  }
+  return '';
+}
+
+async function fetchExistingTemplateKeys() {
+  const res = await fetch('/api/admin/templates', { headers: { 'Authorization': 'Bearer ' + token } });
+  if (!res.ok) return new Set();
+  const data = await res.json();
+  return new Set((data.templates || []).map(t => t.tkey || t.key).filter(Boolean));
+}
+
+function statusLabel(s) {
+  return s === 'pending' ? '待审核' : s === 'approved' ? '已上线' : '已拒绝';
+}
+
+function renderGridPreview(tkey) {
+  const slots = ['1_1','1_2','1_3','2_1','2_2','2_3','3_1','3_2','3_3'];
+  return slots.map(s => `<img src="${templateFileUrl(tkey, `grid_${s}.png`)}" alt="" loading="lazy" onerror="this.style.display='none'">`).join('');
+}
+
+async function reviewSubmission(id, status) {
+  const res = await fetch('/api/admin/submissions/review', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+    body: JSON.stringify({ id: parseInt(id), status }),
+  });
+  const data = await res.json();
+  if (data.ok) loadSubmissions();
+  else alert(data.error || '操作失败');
+}
+
+// ========== 主题切换 ==========
+(function () {
+  const dots = document.querySelectorAll('#themeSwitcher .theme-dot');
+  const saved = localStorage.getItem('admin_theme') || 'green';
+  document.body.className = 'theme-' + saved;
+  dots.forEach(d => d.classList.toggle('active', d.dataset.theme === saved));
+  dots.forEach(d => d.addEventListener('click', () => {
+    document.body.className = 'theme-' + d.dataset.theme;
+    localStorage.setItem('admin_theme', d.dataset.theme);
+    dots.forEach(x => x.classList.remove('active'));
+    d.classList.add('active');
+  }));
+})();
+
+// ========== 模板管理 ==========
+
+function loadTemplateList() {
+  const list = document.getElementById('tplList');
+  list.innerHTML = '<span style="color:var(--text-muted);font-size:0.72rem;">加载中...</span>';
+  fetch('/api/admin/templates', { headers: { 'Authorization': 'Bearer ' + token } })
+    .then(r => { if (r.status === 401) { logout(); throw new Error('unauth'); } return r.json(); })
+    .then(data => {
+      if (!data.templates || data.templates.length === 0) {
+        list.innerHTML = '<div class="glass" style="text-align:center;padding:20px;color:var(--text-muted);font-size:0.8rem;">暂无模板</div>';
+        return;
+      }
+      list.innerHTML = data.templates.map(t => {
+        var k = t.tkey || t.key;
+        var statusBadge = t.status === 'pending' ? '<span class="sub-status pending">待审核</span>' : '';
+        var distHtml = (typeof t.distance === 'number' && t.distance > 0)
+          ? '<div class="tpl-dist">📏 ' + t.distance.toFixed(2) + ' km</div>'
+          : '<div class="tpl-dist unknown">📏 未知</div>';
+        var catHtml = '<span class="tpl-cat-tag">' + catLabel(t.category) + '</span>';
+        return '<div class="sub-card" data-tkey="' + k + '">'
+          + '<h4>' + escHtml(t.name) + ' <span style="font-size:0.6rem;color:var(--text-muted);">' + k + '</span> ' + statusBadge + catHtml + '</h4>'
+          + distHtml
+          + '<div class="sub-preview">' + renderTplPreview(k) + '</div>'
+          + '<div class="sub-actions">'
+            + '<button class="btn-sm" onclick="renameTemplate(\'' + k + '\')">✏️ 改名</button>'
+            + '<button class="btn-reject" onclick="deleteTemplate(\'' + k + '\', this)">🗑 删除</button>'
+          + '</div>'
+          + '</div>';
+      }).join('');
+    }).catch(e => { if (e.message !== 'unauth') list.innerHTML = '<span style="color:#ef4444;">加载失败</span>'; });
+}
+
+function catLabel(cat) {
+  if (cat === 'hiking') return '🥾 徒步';
+  if (cat === 'travel') return '🗺 旅游';
+  return '🚴 骑行';
+}
+
+function renderTplPreview(key) {
+  const slots = ['1_1','1_2','1_3','2_1','2_2','2_3','3_1','3_2','3_3'];
+  return slots.map(s => `<img src="${templateFileUrl(key, `grid_${s}.png`)}" alt="" loading="lazy" onerror="this.style.opacity='0.2'">`).join('');
+}
+
+async function renameTemplate(key) {
+  const newName = prompt('请输入新名称：');
+  if (!newName || !newName.trim()) return;
+  const res = await fetch('/api/admin/templates/' + encodeURIComponent(key), {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+    body: JSON.stringify({ name: newName.trim() }),
+  });
+  const data = await res.json();
+  if (data.ok) {
+    // Refresh current tab
+    if (!document.getElementById('tabSubs').classList.contains('hidden')) loadSubmissions();
+    if (!document.getElementById('tabTemplates').classList.contains('hidden')) loadTemplateList();
+  } else {
+    alert(data.error || '重命名失败');
+  }
+}
+
+async function deleteTemplate(key, btn) {
+  if (!confirm('确定删除模板 ' + key + ' 吗？此操作不可撤销。')) return;
+  const card = btn ? btn.closest('.sub-card') : null;
+  if (btn) { btn.disabled = true; btn.textContent = '删除中…'; }
+  try {
+    const res = await fetch('/api/admin/templates/' + encodeURIComponent(key), {
+      method: 'DELETE',
+      headers: { 'Authorization': 'Bearer ' + token },
+    });
+    const data = await res.json();
+    if (data.ok) {
+      // 局部移除，不整页刷新
+      if (card) {
+        card.style.transition = 'opacity 0.25s, transform 0.25s';
+        card.style.opacity = '0';
+        card.style.transform = 'scale(0.92)';
+        setTimeout(() => {
+          card.remove();
+          const list = document.getElementById('tplList');
+          if (list && !list.querySelector('.sub-card')) {
+            list.innerHTML = '<div class="glass" style="text-align:center;padding:20px;color:var(--text-muted);font-size:0.8rem;">暂无模板</div>';
+          }
+        }, 250);
+      } else {
+        loadTemplateList();
+      }
+    } else {
+      alert(data.error || '删除失败');
+      if (btn) { btn.disabled = false; btn.textContent = '🗑 删除'; }
+    }
+  } catch (e) {
+    alert('网络错误，删除失败');
+    if (btn) { btn.disabled = false; btn.textContent = '🗑 删除'; }
+  }
+}
+
+// ========== 批量上传路线 ==========
+
+
+// 轨迹解析 — 使用 TrajectoryEngine（完全参考 GPXSee 架构）
+// 延迟初始化：模块脚本加载前 TrajectoryEngine 未定义
+let _engine = null;
+function getEngine() { return _engine || (_engine = new TrajectoryEngine()); }
+
+async function adminParseFile(file) {
+  const result = await getEngine().parse(file);
+  if (!result.ok) return null;
+  return result;
+}
+
+// ==================== 渲染工具 ====================
+
+function smoothSegment(segment, targetCount) {
+  if (segment.length >= targetCount || segment.length < 3) return segment.slice();
+  const wrap = [...segment];
+  const f = segment[0], l = segment[segment.length - 1];
+  wrap.unshift(new TrackPoint(f.lng * 2 - segment[1].lng, f.lat * 2 - segment[1].lat));
+  wrap.push(new TrackPoint(l.lng * 2 - segment[segment.length - 2].lng, l.lat * 2 - segment[segment.length - 2].lat));
+  const per = Math.ceil(targetCount / (segment.length - 1));
+  const result = [];
+  for (let i = 1; i < wrap.length - 2; i++) {
+    const p0 = wrap[i-1], p1 = wrap[i], p2 = wrap[i+1], p3 = wrap[i+2];
+    const steps = (i === wrap.length - 3) ? 1 : per;
+    for (let t = 0; t < steps; t++) {
+      const tt = t / steps, tt2 = tt * tt, tt3 = tt2 * tt;
+      result.push(new TrackPoint(
+        0.5 * ((2*p1.lng) + (-p0.lng + p2.lng)*tt + (2*p0.lng - 5*p1.lng + 4*p2.lng - p3.lng)*tt2 + (-p0.lng + 3*p1.lng - 3*p2.lng + p3.lng)*tt3),
+        0.5 * ((2*p1.lat) + (-p0.lat + p2.lat)*tt + (2*p0.lat - 5*p1.lat + 4*p2.lat - p3.lat)*tt2 + (-p0.lat + 3*p1.lat - 3*p2.lat + p3.lat)*tt3)
+      ));
+    }
+  }
+  if (result.length === 0) result.push(l);
+  return result;
+}
+
+function splitByLargeJumps(segments) {
+  if (segments.length <= 1) return segments;
+  const all = [];
+  for (const s of segments) { for (const pt of s) all.push(pt); }
+  const R = 6371000; const rad = d => d * Math.PI / 180;
+  const proj = all.map(p => ({ x: mercatorX(p.lng), y: mercatorY(p.lat) }));
+  const dists = [];
+  for (let i = 1; i < proj.length; i++)
+    dists.push(Math.hypot(proj[i].x - proj[i-1].x, proj[i].y - proj[i-1].y));
+  const sorted = dists.filter(d => d > 0).sort((a, b) => a - b);
+  if (!sorted.length) return segments;
+  const median = sorted[Math.floor(sorted.length / 2)];
+  const xs = proj.map(p => p.x), ys = proj.map(p => p.y);
+  const diagonal = Math.hypot(Math.max(...xs) - Math.min(...xs), Math.max(...ys) - Math.min(...ys));
+  const threshold = Math.max(median * 25, diagonal * 0.08);
+  const parts = [[all[0]]];
+  for (let i = 1; i < all.length; i++) {
+    const d = Math.hypot(proj[i].x - proj[i-1].x, proj[i].y - proj[i-1].y);
+    if (d > threshold && parts[parts.length - 1].length > 1) parts.push([]);
+    parts[parts.length - 1].push(all[i]);
+  }
+  return parts.filter(p => p.length > 1);
+}
+
+// ==================== Web Mercator 投影 ====================
+
+function mercatorX(lon) { return lon * (Math.PI / 180) * 6378137; }
+function mercatorY(lat) {
+  const rad = lat * (Math.PI / 180);
+  return 6378137 * Math.log(Math.tan(Math.PI / 4 + rad / 2));
+}
+
+function adminRenderCells(result) {
+  // result 是 ParseResult，从中提取所有 TrackData 的所有段
+  const allSegments = [];
+  for (const track of result.tracks) {
+    for (const seg of track.segments) {
+      if (seg.length > 1) allSegments.push(Array.from(seg));
+    }
+  }
+  const segments = splitByLargeJumps(allSegments);
+  const targetEach = Math.max(120, Math.ceil(500 / Math.max(1, segments.length)));
+  const smoothedSegments = segments.map(seg => smoothSegment(seg, targetEach));
+  const allPoints = smoothedSegments.flat();
+  if (!allPoints.length) return [];
+
+  const CELL = 800, FULL = 2400;
+  const xs = allPoints.map(p => mercatorX(p.lng));
+  const ys = allPoints.map(p => mercatorY(p.lat));
+  const xMin = Math.min(...xs), xMax = Math.max(...xs);
+  const yMin = Math.min(...ys), yMax = Math.max(...ys);
+  const xRange = xMax - xMin || 1, yRange = yMax - yMin || 1;
+  const padX = xRange * 0.05, padY = yRange * 0.05;
+  const maxRange = Math.max(xRange, yRange);
+  const xCenter = (xMin + xMax) / 2, yCenter = (yMin + yMax) / 2;
+  const half = maxRange / 2 + Math.max(padX, padY);
+  const xLow = xCenter - half, xHigh = xCenter + half;
+  const yLow = yCenter - half, yHigh = yCenter + half;
+  const mapX = (mx) => ((mx - xLow) / (xHigh - xLow)) * FULL;
+  const mapY = (my) => FULL - ((my - yLow) / (yHigh - yLow)) * FULL;
+
+  const fullCanvas = document.createElement('canvas');
+  fullCanvas.width = FULL; fullCanvas.height = FULL;
+  const fctx = fullCanvas.getContext('2d');
+  fctx.strokeStyle = '#DC3232'; fctx.lineWidth = 3;
+  fctx.lineCap = 'round'; fctx.lineJoin = 'round';
+
+  for (const segment of smoothedSegments) {
+    if (segment.length < 2) continue;
+    fctx.beginPath();
+    fctx.moveTo(mapX(mercatorX(segment[0].lng)), mapY(mercatorY(segment[0].lat)));
+    for (let i = 1; i < segment.length; i++) {
+      fctx.lineTo(mapX(mercatorX(segment[i].lng)), mapY(mercatorY(segment[i].lat)));
+    }
+    fctx.stroke();
+  }
+
+  const cells = [];
+  for (let row = 0; row < 3; row++) {
+    for (let col = 0; col < 3; col++) {
+      const cell = document.createElement('canvas');
+      cell.width = CELL; cell.height = CELL;
+      const cctx = cell.getContext('2d');
+      cctx.drawImage(fullCanvas, col * CELL, row * CELL, CELL, CELL, 0, 0, CELL, CELL);
+      cells.push(cell.toDataURL('image/png'));
+    }
+  }
+  return cells;
+}
+
+async function handleBatchParse(event) {
+  const target = event.target;
+  const files = Array.from(target.files);
+  if (!files.length) return;
+  const msgEl = document.getElementById('uploadMsg');
+  const category = 'cycling';
+  let usedKeys = new Set(pendingUploads.map(u => u.key));
+  let parsed = 0;
+  for (let fi = 0; fi < files.length; fi++) {
+    const file = files[fi];
+    try {
+      msgEl.innerHTML = '<span class="spin"></span>解析中 ' + (fi + 1) + '/' + files.length + '：' + escHtml(file.name);
+      const result = await getEngine().parse(file);
+      if (!result || !result.ok) { msgEl.innerHTML = '解析失败: ' + (result ? result.error : '无结果'); continue; }
+      const name = file.name.replace(/\.[^.]+$/,'');
+      const cells = adminRenderCells(result);
+      const distance = Math.round(result.tracks.reduce((s, t) => s + t.distance, 0) * 100) / 100;
+      let key = toTemplateFolderName(name);
+      if (!key) continue;
+      if (usedKeys.has(key)) {
+        key = nextTemplateKey(key, usedKeys);
+      }
+      usedKeys.add(key);
+      pendingUploads.push({ name: key, key, cells, file, distance, category, state: 'wait' });
+      parsed++;
+    } catch(e) {
+      console.error('解析错误:', file.name, e);
+      msgEl.innerHTML = '<span style=\"color:#ef4444\">解析 ' + escHtml(file.name) + ' 出错: ' + e.message + '</span>';
+    }
+  }
+
+  msgEl.innerHTML = parsed > 0
+    ? '✅ 已解析 <strong>' + parsed + '/' + files.length + '</strong> 个文件，点击 ☁ 上传或「全部上传」'
+    : '<span style="color:#ef4444;">未能解析出有效轨迹，请检查文件格式</span>';
+  document.getElementById('uploadAllBtn').disabled = parsed === 0;
+  target.value = '';
+  renderUploadList();
+}
+
+function renderUploadList() {
+  const list = document.getElementById('uploadList');
+  if (pendingUploads.length === 0) { list.innerHTML = ''; return; }
+  list.innerHTML = pendingUploads.map((u, i) => {
+    const st = u.state || 'wait';
+    const cardCls = st === 'uploading' ? ' uploading' : st === 'done' ? ' done' : st === 'failed' ? ' failed' : '';
+    let badge, btn;
+    if (st === 'uploading') {
+      badge = '<span class="up-state go"><span class="spin"></span>上传中…</span>';
+      btn = '<button class="btn-approve" disabled style="opacity:0.5;cursor:default;">☁ 上传中</button>';
+    } else if (st === 'done') {
+      badge = '<span class="up-state ok">✅ 已上传</span>';
+      btn = '<button class="btn-sm" disabled style="opacity:0.5;cursor:default;">已完成</button>';
+    } else if (st === 'failed') {
+      badge = '<span class="up-state err">❌ 上传失败</span>';
+      btn = '<button class="btn-approve" onclick="uploadSingle(' + i + ')">↻ 重试</button>';
+    } else {
+      badge = '<span class="up-state wait">待上传</span>';
+      btn = '<button class="btn-approve" onclick="uploadSingle(' + i + ')">☁ 上传</button>';
+    }
+    const distTxt = (u.distance > 0)
+      ? '<div class="tpl-dist">📏 ' + u.distance.toFixed(2) + ' km</div>'
+      : '<div class="tpl-dist unknown">📏 未知</div>';
+    return '<div class="sub-card' + cardCls + '" data-idx="' + i + '">'
+      + '<h4>' + escHtml(u.name) + ' ' + badge + '</h4>'
+      + distTxt + ' <span class="tpl-cat-tag">' + catLabel(u.category) + '</span>'
+      + '<div class="sub-preview">' + renderGridPreviewFromCells(u.cells) + '</div>'
+      + '<div class="sub-actions">' + btn + '</div>'
+      + '</div>';
+  }).join('');
+}
+
+function renderGridPreviewFromCells(cells) {
+  const slots = ['1_1','1_2','1_3','2_1','2_2','2_3','3_1','3_2','3_3'];
+  return cells ? slots.map((_, i) => `<img src="${cells[i]}" alt="">`).join('') : '';
+}
+
+async function uploadSingle(idx) {
+  idx = Number(idx);
+  const u = pendingUploads[idx];
+  if (!u || u.state === 'uploading' || u.state === 'done') return false;
+  u.state = 'uploading';
+  renderUploadList();
+  try {
+    const res = await fetch('/api/admin/templates', {
+      method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+      body: JSON.stringify({ name: u.name, key: u.key, cells: u.cells, distance: u.distance, category: u.category }),
+    });
+    const data = await res.json();
+    if (data.ok) {
+      u.key = data.key || u.key;
+      u.name = data.name || u.key;
+      u.state = 'done'; u.uploaded = true;
+      renderUploadList();
+      document.getElementById('uploadMsg').innerHTML = '已上传到云端：<strong>' + escHtml(data.name || u.name) + '</strong>';
+      return true;
+    } else {
+      u.state = 'failed';
+      renderUploadList();
+      document.getElementById('uploadMsg').innerHTML = '<span style="color:#ef4444;">上传失败：' + escHtml(data.error || '未知错误') + '</span>';
+      return false;
+    }
+  } catch (e) {
+    u.state = 'failed';
+    renderUploadList();
+    document.getElementById('uploadMsg').innerHTML = '<span style="color:#ef4444;">❌ 网络错误，上传失败</span>';
+    return false;
+  }
+}
+
+async function uploadAllPending() {
+  const pending = pendingUploads.filter(u => u.state !== 'done');
+  if (pending.length === 0) { document.getElementById('uploadMsg').textContent = '没有待上传的轨迹'; return; }
+  const allBtn = document.getElementById('uploadAllBtn');
+  allBtn.disabled = true;
+  const wrap = document.getElementById('upProgress');
+  const fill = document.getElementById('upProgressFill');
+  const ptxt = document.getElementById('upProgressTxt');
+  wrap.classList.add('show');
+
+  const total = pendingUploads.length;
+  let ok = 0, fail = 0, done = pendingUploads.filter(u => u.state === 'done').length;
+  for (let i = 0; i < pendingUploads.length; i++) {
+    if (pendingUploads[i].state === 'done') continue;
+    ptxt.innerHTML = '<span class="spin"></span>上传中 ' + (done + 1) + '/' + total + '：' + escHtml(pendingUploads[i].name);
+    const success = await uploadSingle(i);
+    if (success) ok++; else fail++;
+    done++;
+    fill.style.width = Math.round(done / total * 100) + '%';
+  }
+
+  ptxt.innerHTML = '完成：成功 <strong style="color:var(--accent)">' + ok + '</strong>'
+    + (fail > 0 ? '，失败 <strong style="color:#ef4444">' + fail + '</strong>（点卡片「↻ 重试」）' : '，全部成功 🎉');
+  document.getElementById('uploadMsg').innerHTML = fail === 0
+    ? '🎉 全部上传完成，共 ' + ok + ' 条已上线到模板库'
+    : '⚠️ 上传完成，' + ok + ' 成功 / ' + fail + ' 失败';
+  allBtn.disabled = false;
+}
+
+// ========== 初始化 ==========
+(function () {
+  const saved = sessionStorage.getItem('admin_token');
+  if (saved) { token = saved; showPanel(); loadStats(); }
+})();
+
+setInterval(() => { if (token) loadStats(); }, 60000);
+</script>
+
+</body>
+</html>

@@ -1,0 +1,3067 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>旅行记忆</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🌴</text></svg>">
+<link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<link rel="stylesheet" href="/coloris.min.css" />
+<script src="/coloris.min.js"></script>
+<script src="/photo-utils.js"></script>
+<style>
+/* ============ CSS 变量 ============ */
+:root {
+  --glass-bg: rgba(18, 18, 18, 0.50);
+  --glass-bg-light: rgba(18, 18, 18, 0.35);
+  --glass-border: rgba(255, 255, 255, 0.10);
+  --glass-blur: 24px;
+  --glass-radius: 24px;
+  --text-main: rgba(255, 252, 248, 0.98);
+  --text-sub: rgba(255, 252, 248, 0.82);
+  --text-muted: rgba(255, 252, 248, 0.55);
+  --accent: #4ade80;
+  --accent-warm: #fb923c;
+}
+
+/* ============ 全局 ============ */
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  background: url('/bg.webp') center/cover fixed;
+  color: var(--text-main);
+  font-family: 'Nunito', 'PingFang SC', 'Microsoft YaHei', sans-serif;
+  min-height: 100vh;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* 背景图片元素（WebGL 纹理源） */
+#bgImage {
+  position: fixed;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  z-index: -999;
+  pointer-events: none;
+  opacity: 0;
+}
+
+/* ============ 顶部导航条 ============ */
+.top-nav {
+  position: fixed;
+  top: 0; left: 0; right: 0;
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 9px 20px;
+  background: rgba(18, 18, 18, 0.55);
+  backdrop-filter: blur(20px) saturate(180%);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+.top-nav a {
+  color: rgba(255, 252, 248, 0.62);
+  text-decoration: none;
+  font-size: 12.5px;
+  font-weight: 600;
+  padding: 5px 14px;
+  border-radius: 18px;
+  transition: all 0.2s;
+  letter-spacing: 0.3px;
+}
+.top-nav a:hover {
+  color: rgba(255, 252, 248, 0.95);
+  background: rgba(255, 255, 255, 0.07);
+}
+.top-nav a.active {
+  color: var(--accent);
+  background: rgba(74, 222, 128, 0.10);
+}
+body { padding-top: 48px; }
+
+/* ============ 玻璃卡片 ============ */
+.glass {
+  position: relative;
+  overflow: hidden;
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--glass-radius);
+  box-shadow: 0 8px 32px rgba(0,0,0,0.30), inset 0 1px 0 rgba(255,255,255,0.05);
+}
+/* CSS 兜底：WebGL 不可用时启用 backdrop-filter */
+.glass.css-fallback {
+  backdrop-filter: blur(var(--glass-blur)) saturate(180%);
+  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(180%);
+}
+
+.glass-light {
+  position: relative;
+  overflow: hidden;
+  background: var(--glass-bg-light);
+  border: 1px solid var(--glass-border);
+  border-radius: 18px;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.20);
+}
+.glass-light.css-fallback {
+  backdrop-filter: blur(18px) saturate(150%);
+  -webkit-backdrop-filter: blur(18px) saturate(150%);
+}
+
+/* WebGL 液态玻璃画布 */
+.glass-canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+  pointer-events: none;
+  z-index: 0;
+}
+
+/* 玻璃面板内容层 */
+.glass-content {
+  position: relative;
+  z-index: 1;
+}
+
+/* ============ 布局 ============ */
+.page-wrap {
+  max-width: 560px;
+  margin: 0 auto;
+  padding: 6px 10px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.main-row {
+  display: flex;
+  gap: 6px;
+  align-items: flex-start;
+}
+.main-row > .panel:first-child {
+  flex: 0 0 auto;
+  min-width: 0;
+}
+.main-row > .panel:last-child {
+  flex: 0 0 auto;
+  min-width: 0;
+  max-width: 180px;
+  margin-left: auto;
+}
+
+/* ============ 头部 ============ */
+.header {
+  text-align: center;
+  padding: 6px 10px;
+}
+.header h1 {
+  font-size: 1.2rem;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  text-shadow: 0 2px 8px rgba(0,0,0,0.5);
+}
+.header p {
+  font-size: 0.72rem;
+  color: var(--text-sub);
+  margin-top: 1px;
+  text-shadow: 0 1px 4px rgba(0,0,0,0.5);
+}
+
+/* ============ 面板通用 ============ */
+.panel {
+  padding: 8px;
+}
+.panel-title {
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: var(--text-main);
+  margin-bottom: 5px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.panel-subtitle {
+  font-size: 0.68rem;
+  color: var(--text-muted);
+  margin-bottom: 5px;
+  line-height: 1.35;
+}
+
+/* ============ 上传九宫格 ============ */
+.upload-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 4px;
+  max-width: 210px;
+  margin: 0 auto;
+}
+.upload-cell {
+  aspect-ratio: 1;
+  border-radius: 10px;
+  cursor: pointer;
+  overflow: hidden;
+  position: relative;
+  transition: all 0.2s;
+  border: 2px dashed rgba(255,255,255,0.15);
+  background: rgba(255,255,255,0.04);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.upload-cell:hover {
+  border-color: rgba(255,255,255,0.40);
+  background: rgba(255,255,255,0.10);
+}
+.upload-cell.filled {
+  border: 2px solid rgba(255,255,255,0.20);
+  cursor: grab;
+  background: transparent;
+  position: relative;
+}
+.upload-cell.filled:active { cursor: grabbing; }
+.upload-cell .plus {
+  font-size: 1.4rem;
+  font-weight: 200;
+  color: rgba(255,255,255,0.25);
+  user-select: none;
+}
+/* 替换提示 */
+.upload-cell.filled::after {
+  content: '点击替换';
+  position: absolute;
+  bottom: 4px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 0.55rem;
+  color: #fff;
+  background: rgba(0,0,0,0.65);
+  border-radius: 4px;
+  padding: 1px 6px;
+  white-space: nowrap;
+  opacity: 0;
+  transition: opacity 0.2s;
+  pointer-events: none;
+  z-index: 3;
+}
+.upload-cell.filled:hover::after { opacity: 1; }
+
+/* 拖拽上传高亮 */
+.upload-grid.drag-over {
+  outline: 2px dashed var(--accent-warm);
+  outline-offset: 2px;
+  border-radius: 6px;
+}
+.upload-cell .idx-badge {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  font-size: 0.55rem;
+  color: #fff;
+  background: rgba(0,0,0,0.55);
+  border-radius: 3px;
+  padding: 0 4px;
+  font-weight: 700;
+  z-index: 2;
+}
+.upload-cell img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+/* Sortable ghost */
+.sortable-ghost { opacity: 0.3; border-color: var(--accent-warm) !important; }
+
+/* 上传按钮 */
+.btn-row {
+  display: flex;
+  gap: 5px;
+  justify-content: center;
+  margin-top: 8px;
+  flex-wrap: wrap;
+}
+.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 5px 10px;
+  border-radius: 9px;
+  font-size: 0.7rem;
+  font-weight: 700;
+  border: none;
+  cursor: pointer;
+  transition: all 0.2s;
+  font-family: inherit;
+}
+.btn-primary {
+  background: rgba(74, 222, 128, 0.25);
+  color: var(--accent);
+  border: 1px solid rgba(74, 222, 128, 0.2);
+}
+.btn-primary:hover { background: rgba(74, 222, 128, 0.35); transform: translateY(-1px); }
+.btn-ghost {
+  background: rgba(255,255,255,0.06);
+  color: var(--text-sub);
+  border: 1px solid rgba(255,255,255,0.08);
+}
+.btn-ghost:hover { background: rgba(255,255,255,0.12); color: var(--text-main); }
+.btn-download {
+  background: rgba(251, 146, 60, 0.30);
+  color: var(--accent-warm);
+  border: 1px solid rgba(251, 146, 60, 0.25);
+  padding: 7px 18px;
+  font-size: 0.75rem;
+}
+.btn-download:hover { background: rgba(251, 146, 60, 0.45); transform: translateY(-1px); }
+
+.drag-hint {
+  font-size: 0.62rem;
+  color: var(--text-muted);
+  text-align: center;
+  margin-top: 4px;
+}
+
+/* ============ 模板面板 ============ */
+
+/* 搜索框 */
+.search-wrap {
+  position: relative;
+  margin-bottom: 6px;
+}
+.search-wrap input {
+  width: 100%;
+  padding: 6px 8px 6px 26px;
+  border-radius: 9px;
+  border: 1px solid rgba(255,255,255,0.10);
+  background: rgba(255,255,255,0.06);
+  color: var(--text-main);
+  font-size: 0.72rem;
+  font-family: inherit;
+  outline: none;
+  transition: all 0.2s;
+  backdrop-filter: blur(10px);
+}
+.search-wrap input:focus {
+  border-color: rgba(255,255,255,0.25);
+  background: rgba(255,255,255,0.10);
+}
+.search-wrap input::placeholder { color: var(--text-muted); }
+.search-wrap .search-icon {
+  position: absolute;
+  left: 7px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--text-muted);
+  font-size: 0.7rem;
+  pointer-events: none;
+}
+
+/* 竖向模板列表 */
+.tpl-list {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  max-height: 260px;
+  overflow-y: auto;
+  scroll-behavior: smooth;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255,255,255,0.10) transparent;
+  padding-right: 2px;
+  margin-bottom: 0;
+}
+.tpl-list::-webkit-scrollbar { width: 3px; }
+.tpl-list::-webkit-scrollbar-thumb {
+  background: rgba(255,255,255,0.10);
+  border-radius: 2px;
+}
+
+.tpl-item {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 6px;
+  border-radius: 7px;
+  border: 1.5px solid rgba(255,255,255,0.06);
+  background: rgba(255,255,255,0.03);
+  cursor: pointer;
+  transition: all 0.2s;
+}
+.tpl-item:hover {
+  border-color: rgba(255,255,255,0.22);
+  background: rgba(255,255,255,0.08);
+}
+.tpl-item.selected {
+  border-color: var(--accent-warm);
+  box-shadow: 0 0 14px rgba(251, 146, 60, 0.25);
+  background: rgba(251, 146, 60, 0.10);
+  animation: tplPulse 2s ease-in-out infinite;
+}
+.tpl-item.selected::after {
+  content: '✓';
+  margin-left: auto;
+  font-size: 0.75rem;
+  color: var(--accent-warm);
+  font-weight: 800;
+}
+@keyframes tplPulse {
+  0%, 100% { box-shadow: 0 0 10px rgba(251, 146, 60, 0.20); }
+  50% { box-shadow: 0 0 22px rgba(251, 146, 60, 0.40); }
+}
+.tpl-item.hidden-by-search { display: none; }
+.tpl-item img {
+  width: 28px;
+  height: 28px;
+  border-radius: 5px;
+  object-fit: contain;
+  background: rgba(0,0,0,0.25);
+  flex-shrink: 0;
+}
+.tpl-item .tpl-name {
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: var(--text-sub);
+}
+.tpl-item.selected .tpl-name { color: var(--accent-warm); }
+
+/* 用户上传的临时模板 */
+.tpl-item.uploaded {
+  border: 1px solid rgba(251,146,60,0.25);
+  background: rgba(251,146,60,0.06);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+}
+.tpl-item.uploaded:hover { background: rgba(251,146,60,0.12); }
+.tpl-item.uploaded .tpl-name { color: var(--accent-warm); }
+
+/* 无结果提示 */
+.no-results {
+  text-align: center;
+  padding: 24px;
+  color: var(--text-muted);
+  font-size: 0.85rem;
+  display: none;
+}
+
+/* ============ 颜色 & 粗细控件 ============ */
+.ctrl-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+.ctrl-item {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.ctrl-label {
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: var(--text-sub);
+  white-space: nowrap;
+}
+.ctrl-val {
+  font-size: 0.65rem;
+  color: var(--text-muted);
+  font-family: 'SF Mono', 'Cascadia Code', monospace;
+  min-width: 40px;
+}
+
+/* Coloris 色块圆角 */
+.clr-field button {
+  border-radius: 8px !important;
+}
+
+/* 手机端调色板缩小 */
+@media (max-width: 480px) {
+  .clr-picker {
+    max-width: 90vw !important;
+    left: 5vw !important;
+    font-size: 0.75rem !important;
+  }
+  .clr-picker .clr-swatches button {
+    width: 22px !important;
+    height: 22px !important;
+  }
+  .clr-picker .clr-hue, .clr-picker .clr-alpha {
+    height: 14px !important;
+  }
+}
+
+/* 颜色选择器 */
+input[type="color"] {
+  -webkit-appearance: none;
+  width: 26px;
+  height: 26px;
+  border-radius: 7px;
+  border: 2px solid rgba(255,255,255,0.15);
+  cursor: pointer;
+  background: transparent;
+  padding: 1px;
+}
+input[type="color"]::-webkit-color-swatch-wrapper { padding: 0; }
+input[type="color"]::-webkit-color-swatch { border-radius: 5px; border: none; }
+
+/* 帮助问号 */
+.help-dot {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 15px;
+  height: 15px;
+  border-radius: 50%;
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 1;
+  color: rgba(255,255,255,0.85);
+  background: rgba(255,255,255,0.18);
+  border: 1px solid rgba(255,255,255,0.28);
+  cursor: help;
+  user-select: none;
+  flex-shrink: 0;
+}
+.help-dot:hover { background: rgba(255,255,255,0.3); }
+
+#hoverTip {
+  position: fixed;
+  max-width: 220px;
+  background: rgba(20,20,30,0.96);
+  color: #fff;
+  font-size: 11px;
+  line-height: 1.55;
+  font-weight: 400;
+  padding: 8px 11px;
+  border-radius: 8px;
+  box-shadow: 0 6px 20px rgba(0,0,0,0.35);
+  white-space: pre-line;
+  text-align: left;
+  z-index: 9999;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.12s;
+  transform: translate(-50%, -100%);
+}
+#hoverTip.show { opacity: 1; }
+
+/* 滑块 */
+input[type="range"] {
+  -webkit-appearance: none;
+  width: 64px;
+  height: 4px;
+  border-radius: 2px;
+  background: rgba(255,255,255,0.12);
+  outline: none;
+  cursor: pointer;
+}
+input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+  cursor: pointer;
+  transition: transform 0.1s;
+}
+input[type="range"]:active::-webkit-slider-thumb { transform: scale(1.15); }
+
+/* ============ 预览区域 ============ */
+.preview-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 4px;
+  max-width: 320px;
+  margin: 0 auto;
+}
+.preview-grid canvas {
+  width: 100%;
+  border-radius: 9px;
+  box-shadow: 0 3px 12px rgba(0,0,0,0.25);
+  aspect-ratio: 1;
+  background: rgba(0,0,0,0.3);
+}
+
+/* ============ 兑换模态框 ============ */
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0,0,0,0.55);
+  backdrop-filter: blur(4px);
+}
+.modal-overlay.show {
+  display: flex;
+}
+.modal-box {
+  width: 90%;
+  max-width: 360px;
+  padding: 28px 24px;
+  text-align: center;
+}
+.modal-box h3 {
+  font-size: 1.15rem;
+  font-weight: 700;
+  margin-bottom: 6px;
+}
+.modal-box .modal-desc {
+  font-size: 0.8rem;
+  color: var(--text-sub);
+  margin-bottom: 16px;
+}
+.modal-box input {
+  width: 100%;
+  padding: 12px 16px;
+  border-radius: 14px;
+  border: 2px solid rgba(255,255,255,0.12);
+  background: rgba(255,255,255,0.06);
+  color: var(--text-main);
+  font-size: 1rem;
+  text-align: center;
+  letter-spacing: 2px;
+  font-family: inherit;
+  outline: none;
+  text-transform: uppercase;
+  transition: border-color 0.2s;
+}
+.modal-box input:focus { border-color: rgba(74, 222, 128, 0.5); }
+.modal-msg {
+  font-size: 0.8rem;
+  min-height: 22px;
+  margin-top: 8px;
+  transition: color 0.2s;
+}
+.modal-msg.error { color: #ef4444; }
+.modal-msg.success { color: #4ade80; }
+
+/* ============ 赞赏 & 下载模态框 ============ */
+.donate-section {
+  text-align: center;
+  padding: 12px 0 8px;
+  border-top: 1px solid rgba(255,255,255,0.06);
+  border-bottom: 1px solid rgba(255,255,255,0.06);
+  margin: 10px 0 8px;
+}
+.donate-text {
+  font-size: 0.75rem;
+  color: var(--text-sub);
+  margin-bottom: 10px;
+  line-height: 1.5;
+}
+.donate-qr-row {
+  display: flex;
+  gap: 16px;
+  justify-content: center;
+}
+.donate-qr-box {
+  text-align: center;
+}
+.qr-img {
+  width: 100px;
+  height: 100px;
+  border-radius: 10px;
+  object-fit: contain;
+  background: #fff;
+  padding: 4px;
+}
+.qr-label {
+  font-size: 0.65rem;
+  color: var(--text-muted);
+  display: block;
+  margin-top: 4px;
+}
+.contact-line {
+  text-align: center;
+  font-size: 0.72rem;
+  color: var(--text-sub);
+  line-height: 1.6;
+  margin-bottom: 4px;
+}
+.contact-email {
+  color: var(--accent-warm);
+  font-weight: 600;
+  user-select: all;
+}
+
+/* 轨迹预览面板 */
+.track-preview-panel { display: none; }
+.track-preview-panel .mini-map { width: 100%; height: 180px; border-radius: 10px; overflow: hidden; border: 1px solid rgba(255,255,255,0.08); }
+
+/* 浮动投稿按钮 */
+.float-submit-btn {
+  position: fixed;
+  right: 16px;
+  top: 50%;
+  transform: translateY(-50%);
+  z-index: 90;
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  border: 1px solid rgba(251,146,60,0.30);
+  background: rgba(18,18,18,0.35);
+  backdrop-filter: blur(18px) saturate(150%);
+  -webkit-backdrop-filter: blur(18px) saturate(150%);
+  color: var(--accent-warm);
+  font-size: 0.65rem;
+  font-weight: 700;
+  cursor: pointer;
+  display: none;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  line-height: 1.2;
+  transition: all 0.3s;
+  box-shadow: 0 0 24px rgba(251,146,60,0.35), 0 4px 16px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.05);
+  animation: floatPulse 2.5s ease-in-out infinite, floatTilt 4s ease-in-out infinite;
+  font-family: inherit;
+}
+.float-submit-btn:hover {
+  width: 64px; height: 64px;
+  background: rgba(251,146,60,0.12);
+  box-shadow: 0 0 50px rgba(251,146,60,0.6), 0 0 100px rgba(251,146,60,0.2), 0 8px 32px rgba(0,0,0,0.4);
+  border-color: rgba(251,146,60,0.6);
+}
+
+@keyframes floatPulse {
+  0%, 100% { box-shadow: 0 0 24px rgba(251,146,60,0.35), 0 4px 16px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.05); }
+  50% { box-shadow: 0 0 48px rgba(251,146,60,0.5), 0 0 80px rgba(251,146,60,0.15), 0 8px 28px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.08); }
+}
+@keyframes floatTilt {
+  0%, 100% { transform: translateY(-50%) rotate(-2deg); }
+  50% { transform: translateY(-50%) rotate(2deg); }
+}
+
+/* 创建模板 */
+.create-dropzone {
+  border: 2px dashed rgba(255,255,255,0.15);
+  border-radius: 14px;
+  padding: 28px 16px;
+  text-align: center;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  transition: all 0.2s;
+  background: rgba(255,255,255,0.03);
+}
+.create-dropzone:hover, .create-dropzone.drag-over {
+  border-color: var(--accent-warm);
+  background: rgba(251,146,60,0.06);
+}
+
+.create-map-wrap {
+  display: none;
+  width: 100%;
+  height: 280px;
+  border-radius: 12px;
+  overflow: hidden;
+  margin: 10px 0;
+  border: 1px solid rgba(255,255,255,0.10);
+}
+.create-map-wrap .leaflet-container { background: #1a1a2e; }
+.create-actions {
+  display: none;
+}
+
+/* 确认提示气泡 */
+.confirm-toast {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 150;
+  padding: 18px 24px;
+  border-radius: 16px;
+  border: 1px solid rgba(255,255,255,0.12);
+  background: rgba(18,18,18,0.85);
+  backdrop-filter: blur(16px);
+  text-align: center;
+  display: none;
+}
+.confirm-toast.show { display: block; animation: fadeIn 0.2s ease; }
+.confirm-toast p {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--text-main);
+  margin-bottom: 12px;
+}
+.confirm-toast .toast-btns {
+  display: flex;
+  gap: 8px;
+  justify-content: center;
+}
+
+/* 预览空位占位 */
+.preview-cell-placeholder {
+  aspect-ratio: 1;
+  border-radius: 9px;
+  border: 2px dashed rgba(255,255,255,0.10);
+  background: rgba(255,255,255,0.03);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: rgba(255,255,255,0.15);
+  font-size: 1.2rem;
+}
+
+/* 页脚 */
+.site-footer {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 4px 14px;
+  text-align: center;
+  font-size: 0.65rem;
+  color: var(--text-muted);
+  padding: 8px 0;
+}
+.footer-email {
+  color: var(--text-sub);
+  user-select: all;
+}
+.icp-link {
+  color: var(--text-sub);
+  text-decoration: none;
+  white-space: nowrap;
+}
+.icp-link:hover { color: var(--text-main); text-decoration: underline; }
+
+/* ============ 新手引导 ============ */
+.help-btn {
+  position: fixed;
+  bottom: 20px;
+  right: 20px;
+  z-index: 99;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  border: 1px solid rgba(255,255,255,0.12);
+  background: rgba(18,18,18,0.40);
+  backdrop-filter: blur(18px) saturate(150%);
+  -webkit-backdrop-filter: blur(18px) saturate(150%);
+  color: var(--text-main);
+  font-size: 1.1rem;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.25s;
+  box-shadow: 0 4px 20px rgba(0,0,0,0.35), inset 0 1px 0 rgba(255,255,255,0.06);
+}
+.help-btn:hover {
+  background: rgba(18,18,18,0.55);
+  border-color: rgba(255,255,255,0.25);
+  transform: translateY(-2px);
+  box-shadow: 0 6px 28px rgba(0,0,0,0.45), inset 0 1px 0 rgba(255,255,255,0.08);
+}
+
+.guide-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0,0,0,0.55);
+  backdrop-filter: blur(4px);
+}
+.guide-overlay.show { display: flex; }
+
+.guide-box {
+  width: 92%;
+  max-width: 420px;
+  max-height: 80vh;
+  overflow-y: auto;
+  padding: 28px 24px 20px;
+}
+.guide-box h3 {
+  font-size: 1.15rem;
+  font-weight: 700;
+  text-align: center;
+  margin-bottom: 6px;
+}
+.guide-box .guide-subtitle {
+  text-align: center;
+  font-size: 0.78rem;
+  color: var(--text-muted);
+  margin-bottom: 20px;
+}
+
+.guide-step {
+  display: flex;
+  gap: 12px;
+  padding: 14px 0;
+  border-bottom: 1px solid rgba(255,255,255,0.05);
+}
+.guide-step:last-child { border-bottom: none; }
+.guide-step .step-num {
+  flex: 0 0 auto;
+  width: 32px;
+  height: 32px;
+  border-radius: 10px;
+  background: rgba(74,222,128,0.12);
+  border: 1px solid rgba(74,222,128,0.18);
+  color: var(--accent);
+  font-size: 0.85rem;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.guide-step .step-body { flex: 1; }
+.guide-step .step-title {
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: var(--text-main);
+  margin-bottom: 2px;
+}
+.guide-step .step-desc {
+  font-size: 0.75rem;
+  color: var(--text-sub);
+  line-height: 1.5;
+}
+
+.guide-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 18px;
+  gap: 10px;
+}
+.guide-footer .dismiss-label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+  font-size: 0.72rem;
+  color: var(--text-muted);
+  user-select: none;
+}
+.guide-footer .dismiss-label input { accent-color: var(--accent-warm); }
+
+/* ============ 动画 ============ */
+@keyframes shake {
+  0%,100% { transform: translateX(0); }
+  20%,60% { transform: translateX(-6px); }
+  40%,80% { transform: translateX(6px); }
+}
+.shake { animation: shake 0.4s ease; }
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.panel { animation: fadeIn 0.4s ease both; }
+.panel:nth-child(2) { animation-delay: 0.05s; }
+.panel:nth-child(3) { animation-delay: 0.10s; }
+.panel:nth-child(4) { animation-delay: 0.15s; }
+
+/* ============ 响应式 ============ */
+/* 平板 / 小屏桌面 */
+@media (max-width: 768px) {
+  .page-wrap { max-width: 560px; margin: 0 auto; padding: 8px 10px 20px; gap: 8px; }
+  .main-row { flex-direction: column; gap: 8px; }
+  .main-row > .panel:first-child,
+  .main-row > .panel:last-child {
+    flex: 1 1 auto;
+    max-width: none;
+    margin-left: 0;
+  }
+  .upload-grid { max-width: 240px; }
+  .tpl-list { max-height: 200px; }
+  .tpl-item { padding: 6px 8px; }
+  .tpl-item img { width: 32px; height: 32px; }
+}
+
+/* 手机端 */
+@media (max-width: 480px) {
+  .page-wrap { max-width: 380px; margin: 0 auto; padding: 8px 10px 24px; gap: 8px; }
+  .panel { padding: 10px; }
+  .header { padding: 10px; }
+  .header h1 { font-size: 1.15rem; }
+  .header p { font-size: 0.68rem; }
+
+  .panel-title { font-size: 0.78rem; margin-bottom: 5px; }
+  .panel-subtitle { font-size: 0.65rem; margin-bottom: 6px; }
+
+  .upload-grid { max-width: 220px; gap: 4px; }
+  .upload-cell .plus { font-size: 1.2rem; }
+
+  .tpl-list { max-height: 200px; gap: 3px; }
+  .tpl-item { padding: 6px 8px; gap: 6px; }
+  .tpl-item img { width: 30px; height: 30px; }
+  .tpl-item .tpl-name { font-size: 0.72rem; }
+
+  .search-wrap { margin-bottom: 6px; }
+  .search-wrap input { padding: 7px 7px 7px 24px; font-size: 0.72rem; }
+  .search-wrap .search-icon { left: 6px; font-size: 0.65rem; }
+
+  .ctrl-row { gap: 8px; }
+  .ctrl-label { font-size: 0.7rem; }
+  .ctrl-val { font-size: 0.62rem; min-width: 36px; }
+  input[type="color"] { width: 30px; height: 30px; }
+  input[type="range"] { width: 56px; }
+
+  .btn { padding: 7px 12px; font-size: 0.72rem; }
+  .btn-download { padding: 8px 16px; font-size: 0.75rem; }
+
+  .preview-grid { max-width: 280px; gap: 3px; }
+
+  .help-btn { width: 40px; height: 40px; bottom: 12px; right: 12px; font-size: 1rem; }
+
+  .guide-box { max-width: 92vw; padding: 20px 16px 16px; }
+  .guide-step { padding: 10px 0; gap: 8px; }
+  .guide-step .step-num { width: 26px; height: 26px; font-size: 0.75rem; }
+  .guide-step .step-title { font-size: 0.78rem; }
+  .guide-step .step-desc { font-size: 0.7rem; }
+
+  .modal-box { max-width: 90vw; padding: 20px 16px; }
+  .donate-qr-row { gap: 10px; }
+  .qr-img { width: 80px; height: 80px; }
+
+  .confirm-toast { width: 85vw; }
+
+  .site-footer { font-size: 0.6rem; }
+}
+</style>
+</head>
+<body>
+
+<!-- ===== 顶部导航 ===== -->
+<nav class="top-nav">
+  <a href="/" class="active">🌴 旅行记忆</a>
+  <a href="/3d-poster.html">🏔️ 3D轨迹海报</a>
+</nav>
+
+<!-- 背景图片（WebGL 纹理源，视觉上隐藏） -->
+<img id="bgImage" src="/bg.webp" alt="" crossorigin="anonymous">
+
+<div class="page-wrap">
+
+  <!-- ===== 头部 ===== -->
+  <div class="header">
+    <h1>🌴 旅行记忆</h1>
+    <p>上传 9 张照片，叠加骑行轨迹，生成专属回忆</p>
+  </div>
+
+  <!-- ===== 上传 + 模板（左右并排）===== -->
+  <div class="main-row">
+
+    <!-- ===== 上传面板 ===== -->
+    <div class="glass panel" id="uploadPanel">
+    <canvas class="glass-canvas"></canvas>
+    <div class="glass-content">
+      <div class="panel-title">📷 上传照片</div>
+      <div class="panel-subtitle">点击格子单张上传，或点击下方按钮批量上传（自动居中裁剪 1:1）</div>
+      <div class="upload-grid" id="grid9"></div>
+      <div class="drag-hint">↕ 拖动图片可调整顺序</div>
+      <div class="btn-row">
+        <button class="btn btn-primary" onclick="document.getElementById('batchInput').click()">📁 批量上传</button>
+        <input type="file" id="batchInput" accept="image/*,.heic,.heif" multiple hidden onchange="handleBatchUpload(event)">
+        <button class="btn btn-ghost" onclick="clearAll()">🗑 清空</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== 模板面板 ===== -->
+  <div class="glass panel" id="templatePanel">
+    <canvas class="glass-canvas"></canvas>
+    <div class="glass-content">
+      <div class="panel-title">🗺 选择轨迹模板</div>
+
+      <!-- 搜索框 -->
+      <div class="search-wrap">
+        <span class="search-icon">🔍</span>
+        <input type="text" id="templateSearch" placeholder="搜索模板..." oninput="filterTemplates(this.value)">
+      </div>
+
+      <!-- 竖向模板列表 -->
+      <div class="tpl-list" id="templateList"></div>
+
+      <!-- 无结果 -->
+      <div class="no-results" id="noResults">😕 未找到匹配的模板</div>
+
+      <!-- 创建模板按钮 -->
+      <button class="btn btn-primary" style="width:100%;margin-top:6px;font-size:0.68rem;padding:5px;" onclick="openUploadDialog()">➕ 上传轨迹创建模板</button>
+      <div style="font-size:0.58rem;color:rgba(0,0,0,0.4);margin-top:3px;text-align:center;">GPX / KML / KMZ / TCX / FIT / GeoJSON · 推荐 GPX（含高度数据）</div>
+    </div>
+  </div>
+
+  </div><!-- /main-row -->
+
+  <!-- ===== 轨迹样式面板 ===== -->
+  <div class="glass panel" id="ctrlPanel">
+    <canvas class="glass-canvas"></canvas>
+    <div class="glass-content">
+      <div class="ctrl-row">
+        <div class="ctrl-item">
+          <span class="ctrl-label">🎨 轨迹颜色</span>
+          <input type="text" id="trailColorPicker" value="#dc3232" data-coloris style="width:28px;height:28px;border-radius:6px;border:1px solid rgba(255,255,255,0.12);background:transparent;color:transparent;cursor:pointer;font-size:0;padding:0;caret-color:transparent;" readonly>
+          <span class="ctrl-val" id="trailColorHex">#dc3232</span>
+        </div>
+        <div class="ctrl-item">
+          <span class="ctrl-label">📏 线条粗细</span>
+          <input type="range" id="trailWidthSlider" min="0.3" max="5" step="0.1" value="2">
+          <span class="ctrl-val" id="trailWidthVal">2</span>
+        </div>
+        <div class="ctrl-item">
+          <span class="help-dot" data-tip="勾选 = 不裁剪，保留原图比例&#10;取消 = 裁剪为 1:1 正方形&#10;&#10;两者在朋友圈九宫格封面显示效果一致，区别仅在点开后的大图">?</span>
+          <span class="ctrl-label">✂️ 裁切</span>
+          <label style="display:flex;align-items:center;gap:5px;cursor:pointer;">
+            <input type="checkbox" id="keepRatioToggle" checked style="width:16px;height:16px;accent-color:var(--accent-warm);cursor:pointer;">
+            <span class="ctrl-val" id="ratioToggleText" style="white-space:nowrap;">保持原图</span>
+          </label>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== 轨迹预览面板 ===== -->
+  <div class="glass panel track-preview-panel" id="trackPreviewPanel">
+    <canvas class="glass-canvas"></canvas>
+    <div class="glass-content">
+      <div class="panel-title">🗺 轨迹预览</div>
+      <div class="mini-map" id="miniMapWrap"><div id="miniMap" style="width:100%;height:100%;"></div></div>
+      <div style="font-size:0.65rem;color:var(--text-muted);margin-top:4px;text-align:center;" id="trackInfo"></div>
+    </div>
+  </div>
+
+  <!-- ===== 预览面板 ===== -->
+  <div class="glass panel" id="previewCard" style="display:none;">
+    <canvas class="glass-canvas"></canvas>
+    <div class="glass-content">
+      <div class="panel-title">🖼 合成预览</div>
+      <div class="preview-grid" id="previewGrid"></div>
+      <div class="btn-row" style="margin-top:14px;">
+        <button class="btn btn-download" id="btnDownload" onclick="openDownloadModal()">⬇ 下载 9 张高清图</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== 页脚 ===== -->
+  <div class="site-footer">
+    <span>路线投稿 & 反馈：<span class="footer-email">1551575059@qq.com</span></span>
+    <a class="icp-link" href="https://beian.miit.gov.cn/" target="_blank" rel="noopener noreferrer">藏ICP备2026000768号-1</a>
+  </div>
+
+</div>
+
+<!-- ===== 下载 + 赞赏模态框 ===== -->
+<div class="modal-overlay" id="downloadModal">
+  <div class="glass modal-box" style="max-width:340px;">
+    <canvas class="glass-canvas"></canvas>
+    <div class="glass-content">
+      <h3>⬇ 下载高清图</h3>
+
+      <div class="donate-section">
+        <p class="donate-text">如果这个工具帮到了你<br>欢迎赞赏支持 ☕</p>
+        <div class="donate-qr-row">
+          <div class="donate-qr-box">
+            <img src="/wechat-qr.png" alt="微信赞赏码" class="qr-img">
+            <span class="qr-label">微信</span>
+          </div>
+          <div class="donate-qr-box">
+            <img src="/alipay-qr.png" alt="支付宝收款码" class="qr-img">
+            <span class="qr-label">支付宝</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="contact-line">
+        📮 路线投稿 / 问题反馈<br>
+        <span class="contact-email">1551575059@qq.com</span>
+      </div>
+
+      <div class="modal-msg" id="dlMsg"></div>
+      <div class="btn-row" style="margin-top:8px;">
+        <button class="btn btn-download" onclick="doDownload()">⬇ 免费下载</button>
+        <button class="btn btn-ghost" onclick="closeDownloadModal()">关闭</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- 隐藏的文件输入（轨迹上传用） -->
+<input type="file" id="createFileInput" accept=".gpx,.kml,.kmz,.tcx,.fit,.geojson,.json,application/gpx+xml,application/vnd.google-earth.kml+xml,application/vnd.google-earth.kmz,application/octet-stream" hidden onchange="handleCreateFile(event)">
+
+<!-- ===== 路线投稿表单 ===== -->
+<div class="modal-overlay" id="submitModal">
+  <div class="glass modal-box" style="max-width:380px;">
+    <canvas class="glass-canvas"></canvas>
+    <div class="glass-content">
+      <h3 style="color:#000;font-weight:800;font-size:1rem;">✏️ 路线投稿</h3>
+      <p style="color:#000;font-size:0.72rem;margin-bottom:10px;line-height:1.5;">填写越详细，越容易被管理员选中并上线到模板库</p>
+      <label style="display:flex;align-items:flex-start;gap:6px;cursor:pointer;margin-bottom:8px;">
+        <input type="checkbox" id="agreeTerms" style="margin-top:2px;accent-color:var(--accent-warm);">
+        <span style="color:#d4869b;font-size:0.65rem;font-weight:500;line-height:1.4;">你上传的路线及相关数据将归旅行记忆平台所有，平台有权对其进行展示、分发、修改及商业使用。</span>
+      </label>
+
+      <input type="text" id="submitTitle" placeholder="路线标题（至少 3 个字）" maxlength="50" style="width:100%;padding:10px 12px;border-radius:10px;border:1px solid rgba(255,255,255,0.12);background:rgba(255,255,255,0.08);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);color:#fff;font-size:0.85rem;font-weight:600;font-family:inherit;outline:none;margin-bottom:8px;">
+
+      <textarea id="submitDesc" placeholder="路线简介（至少 15 个字）" rows="3" maxlength="500" style="width:100%;padding:10px 12px;border-radius:10px;border:1px solid rgba(255,255,255,0.12);background:rgba(255,255,255,0.08);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);color:#fff;font-size:0.82rem;font-family:inherit;outline:none;resize:vertical;"></textarea>
+
+      <div style="font-size:0.7rem;color:var(--text-muted);margin:4px 0 8px;text-align:right;">
+        <span id="titleCount">0</span>/3 · <span id="descCount">0</span>/15
+      </div>
+
+      <div class="modal-msg" id="submitMsg" style="text-align:center;"></div>
+
+      <div class="btn-row" style="margin-top:8px;">
+        <button class="btn btn-primary" onclick="submitRoute()" style="color:#fff;background:var(--accent-warm);border-color:var(--accent-warm);">🚀 提交投稿</button>
+        <button class="btn btn-ghost" onclick="closeSubmitModal()" style="color:#000;border-color:#ccc;">关闭</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- 浮动投稿按钮 -->
+<button class="float-submit-btn" id="floatSubmitBtn" onclick="openSubmitModal()" title="投稿路线">
+  ✈<span style="font-size:0.55rem;">投稿</span>
+</button>
+
+<!-- ===== 新手引导按钮 ===== -->
+<button class="help-btn" id="helpBtn" title="使用指南">?</button>
+
+<!-- ===== 新手引导弹窗 ===== -->
+<div class="guide-overlay" id="guideOverlay">
+  <div class="glass guide-box">
+    <canvas class="glass-canvas"></canvas>
+    <div class="glass-content">
+      <h3>📖 使用指南</h3>
+      <p class="guide-subtitle">6 步快速上手，生成你的专属旅行记忆</p>
+
+      <div class="guide-step">
+        <div class="step-num">1</div>
+        <div class="step-body">
+          <div class="step-title">📷 上传照片</div>
+          <div class="step-desc">点击九宫格逐个上传，或点击「批量上传」一次选择多张（自动居中裁剪 1:1）</div>
+        </div>
+      </div>
+
+      <div class="guide-step">
+        <div class="step-num">2</div>
+        <div class="step-body">
+          <div class="step-title">↕ 拖拽排序</div>
+          <div class="step-desc">上传后长按图片拖动，自由调整九宫格中照片的排列顺序</div>
+        </div>
+      </div>
+
+      <div class="guide-step">
+        <div class="step-num">3</div>
+        <div class="step-body">
+          <div class="step-title">🔍 选择模板</div>
+          <div class="step-desc">在搜索框输入关键词筛选模板，或点击左右箭头滑动轮播浏览全部轨迹</div>
+        </div>
+      </div>
+
+      <div class="guide-step">
+        <div class="step-num">4</div>
+        <div class="step-body">
+          <div class="step-title">🎨 调整样式</div>
+          <div class="step-desc">修改轨迹颜色（色盘）和线条粗细（滑块），预览实时更新效果</div>
+        </div>
+      </div>
+
+      <div class="guide-step">
+        <div class="step-num">5</div>
+        <div class="step-body">
+          <div class="step-title">👁 预览合成</div>
+          <div class="step-desc">9 张照片全部上传后，自动显示合成预览，叠加轨迹水印效果</div>
+        </div>
+      </div>
+
+      <div class="guide-step">
+        <div class="step-num">6</div>
+        <div class="step-body">
+          <div class="step-title">⬇ 下载导出</div>
+          <div class="step-desc">9 张照片全部上传后，点击「下载」按钮免费下载高清图 ZIP 压缩包</div>
+        </div>
+      </div>
+
+      <div class="guide-footer">
+        <label class="dismiss-label">
+          <input type="checkbox" id="dismissGuide"> 下次不再显示
+        </label>
+        <button class="btn btn-primary" onclick="closeGuide()">知道了</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script type="module">
+import Tracker from './js/modules/tracker.js';
+import './js/modules/trajectory-engine.js';
+window._tracker = new Tracker({ debug: false });
+</script>
+
+<script>
+// ==================== WebGL 液态玻璃渲染器 ====================
+
+// --- GLSL 着色器 ---
+const VERT_SRC = `attribute vec2 a_pos;
+varying vec2 v_uv;
+void main() {
+  v_uv = a_pos * 0.5 + 0.5;
+  gl_Position = vec4(a_pos, 0.0, 1.0);
+}`;
+
+const BLUR_H_FRAG_SRC = `precision highp float;
+varying vec2 v_uv;
+uniform sampler2D u_image;
+uniform vec2 u_canvasSize;
+uniform vec2 u_capsuleTopLeft;
+uniform vec2 u_imageOffset;
+uniform vec2 u_imageDrawSize;
+uniform vec2 u_directionPx;
+uniform int u_radius;
+#define MAX_RADIUS 64
+uniform float u_kernel[MAX_RADIUS];
+vec3 sampleImage(vec2 uv) {
+  return texture2D(u_image, clamp(uv, 0.0, 1.0)).rgb;
+}
+void main() {
+  vec2 domUv = vec2(v_uv.x, 1.0 - v_uv.y);
+  vec2 localPx = domUv * u_canvasSize;
+  vec2 containerPx = u_capsuleTopLeft + localPx;
+  vec2 uv = (containerPx - u_imageOffset) / u_imageDrawSize;
+  vec2 dirUv = u_directionPx / u_imageDrawSize;
+  vec3 res = sampleImage(uv) * u_kernel[0];
+  vec2 l = uv - dirUv;
+  vec2 r = uv + dirUv;
+  for (int i = 1; i < MAX_RADIUS; i++) {
+    if (i < u_radius) {
+      float w = u_kernel[i];
+      res += sampleImage(l) * w;
+      res += sampleImage(r) * w;
+    }
+    l -= dirUv;
+    r += dirUv;
+  }
+  gl_FragColor = vec4(res, 1.0);
+}`;
+
+const BLUR_V_FRAG_SRC = `precision highp float;
+varying vec2 v_uv;
+uniform sampler2D u_tex;
+uniform vec2 u_canvasSize;
+uniform vec2 u_directionPx;
+uniform int u_radius;
+#define MAX_RADIUS 64
+uniform float u_kernel[MAX_RADIUS];
+vec3 sampleTex(vec2 uv) {
+  return texture2D(u_tex, clamp(uv, 0.0, 1.0)).rgb;
+}
+void main() {
+  vec2 uv = v_uv;
+  vec2 dirUv = u_directionPx / u_canvasSize;
+  vec3 res = sampleTex(uv) * u_kernel[0];
+  vec2 l = uv - dirUv;
+  vec2 r = uv + dirUv;
+  for (int i = 1; i < MAX_RADIUS; i++) {
+    if (i < u_radius) {
+      float w = u_kernel[i];
+      res += sampleTex(l) * w;
+      res += sampleTex(r) * w;
+    }
+    l -= dirUv;
+    r += dirUv;
+  }
+  gl_FragColor = vec4(res, 1.0);
+}`;
+
+const COMPOSE_FRAG_SRC = `precision highp float;
+varying vec2 v_uv;
+uniform sampler2D u_blurTex;
+uniform vec2 u_canvasSize;
+uniform float u_edgeMapStartPx;
+uniform float u_edgeMapMaxPx;
+uniform float u_borderRadiusPx;
+float sdRoundBox(vec2 p, vec2 halfSize, float r) {
+  r = clamp(r, 0.0, min(halfSize.x, halfSize.y));
+  vec2 q = abs(p) - (halfSize - vec2(r));
+  return length(max(q, 0.0)) + min(max(q.x, q.y), 0.0) - r;
+}
+vec2 roundBoxOutwardNormal(vec2 p, vec2 halfSize, float r) {
+  float e = 1.0;
+  float dx = sdRoundBox(p + vec2(e, 0.0), halfSize, r) - sdRoundBox(p - vec2(e, 0.0), halfSize, r);
+  float dy = sdRoundBox(p + vec2(0.0, e), halfSize, r) - sdRoundBox(p - vec2(0.0, e), halfSize, r);
+  vec2 g = vec2(dx, dy);
+  float lg = length(g);
+  if (lg < 1e-4) return vec2(0.0, 1.0);
+  return g / lg;
+}
+float roundBoxOppositeDistance(vec2 p, vec2 halfSize, float r, vec2 n) {
+  const int STEPS = 16;
+  const int REFINE = 6;
+  float d0 = sdRoundBox(p, halfSize, r);
+  if (d0 >= 0.0) return 0.0;
+  float t = 1.0;
+  float lo = 0.0;
+  float hi = 0.0;
+  bool foundHi = false;
+  for (int i = 0; i < STEPS; i++) {
+    float d = sdRoundBox(p - n * t, halfSize, r);
+    if (!foundHi) {
+      if (d > 0.0) { hi = t; foundHi = true; }
+      else { lo = t; t += max(1.0, abs(d)); }
+    }
+  }
+  if (!foundHi) hi = max(lo + 1.0, length(halfSize) * 4.0);
+  for (int j = 0; j < REFINE; j++) {
+    float mid = 0.5 * (lo + hi);
+    float d = sdRoundBox(p - n * mid, halfSize, r);
+    if (d < 0.0) lo = mid;
+    else hi = mid;
+  }
+  return hi;
+}
+void main() {
+  vec2 domUv = vec2(v_uv.x, 1.0 - v_uv.y);
+  vec2 localPx = domUv * u_canvasSize;
+  vec2 p = localPx - 0.5 * u_canvasSize;
+  vec2 halfSize = 0.5 * u_canvasSize;
+  float r = u_borderRadiusPx;
+  float sdf = sdRoundBox(p, halfSize, r);
+  float distIn = max(0.0, -sdf);
+  float startPx = max(0.001, u_edgeMapStartPx);
+  float u = clamp((startPx - distIn) / startPx, 0.0, 1.0);
+  float t = 1.0 - pow(1.0 - u, 0.3333333333);
+  float q = t * t;
+  vec2 n = roundBoxOutwardNormal(p, halfSize, r);
+  float maxDelta = roundBoxOppositeDistance(p, halfSize, r, n);
+  float cappedMaxDelta = (u_edgeMapMaxPx > 0.0) ? min(maxDelta, u_edgeMapMaxPx) : maxDelta;
+  vec2 mappedP = p - n * (cappedMaxDelta * q);
+  vec2 mappedLocalPx = mappedP + 0.5 * u_canvasSize;
+  vec2 mappedDomUv = mappedLocalPx / u_canvasSize;
+  vec2 mappedGlUv = vec2(mappedDomUv.x, 1.0 - mappedDomUv.y);
+  vec3 color = texture2D(u_blurTex, mappedGlUv).rgb;
+  gl_FragColor = vec4(color, 1.0);
+}`;
+
+// --- WebGL 工具函数 ---
+const KERNEL_MAX_RADIUS = 64;
+
+function compileShader(gl, type, source) {
+  const shader = gl.createShader(type);
+  gl.shaderSource(shader, source);
+  gl.compileShader(shader);
+  if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) {
+    const log = gl.getShaderInfoLog(shader) || 'Unknown error';
+    gl.deleteShader(shader);
+    throw new Error(log);
+  }
+  return shader;
+}
+
+function createProgram(gl, vertSrc, fragSrc) {
+  const vs = compileShader(gl, gl.VERTEX_SHADER, vertSrc);
+  const fs = compileShader(gl, gl.FRAGMENT_SHADER, fragSrc);
+  const program = gl.createProgram();
+  gl.attachShader(program, vs);
+  gl.attachShader(program, fs);
+  gl.bindAttribLocation(program, 0, 'a_pos');
+  gl.linkProgram(program);
+  gl.deleteShader(vs);
+  gl.deleteShader(fs);
+  if (!gl.getProgramParameter(program, gl.LINK_STATUS)) {
+    const log = gl.getProgramInfoLog(program) || 'Unknown error';
+    gl.deleteProgram(program);
+    throw new Error(log);
+  }
+  return program;
+}
+
+function buildGaussianKernel(radiusPx) {
+  const r = Math.max(0, radiusPx);
+  const radius = Math.min(KERNEL_MAX_RADIUS, Math.max(1, Math.floor(r) + 1));
+  const sigma = Math.max(r * 0.5, 0.001);
+  const kernel = new Float32Array(KERNEL_MAX_RADIUS);
+  let sum = 0;
+  for (let i = 0; i < radius; i++) {
+    const x = i;
+    const w = Math.exp(-(x * x) / (2 * sigma * sigma));
+    kernel[i] = w;
+    sum += i === 0 ? w : 2 * w;
+  }
+  if (sum > 0) {
+    for (let i = 0; i < radius; i++) kernel[i] /= sum;
+  }
+  return { radius, kernel };
+}
+
+function createLiquidGlassRenderer(canvas) {
+  const gl = canvas.getContext('webgl', {
+    alpha: false,
+    premultipliedAlpha: false,
+    antialias: true,
+    depth: false,
+    stencil: false,
+    preserveDrawingBuffer: false,
+  });
+  if (!gl) throw new Error('WebGL not supported');
+
+  const blurProgramH = createProgram(gl, VERT_SRC, BLUR_H_FRAG_SRC);
+  const blurProgramV = createProgram(gl, VERT_SRC, BLUR_V_FRAG_SRC);
+  const composeProgram = createProgram(gl, VERT_SRC, COMPOSE_FRAG_SRC);
+
+  const aPos = 0;
+
+  // Blur H uniforms
+  const uImage = gl.getUniformLocation(blurProgramH, 'u_image');
+  const uBlurCanvasSize = gl.getUniformLocation(blurProgramH, 'u_canvasSize');
+  const uBlurCapsuleTopLeft = gl.getUniformLocation(blurProgramH, 'u_capsuleTopLeft');
+  const uBlurImageOffset = gl.getUniformLocation(blurProgramH, 'u_imageOffset');
+  const uBlurImageDrawSize = gl.getUniformLocation(blurProgramH, 'u_imageDrawSize');
+  const uBlurDirPxH = gl.getUniformLocation(blurProgramH, 'u_directionPx');
+  const uBlurRadiusH = gl.getUniformLocation(blurProgramH, 'u_radius');
+  const uBlurKernelH = gl.getUniformLocation(blurProgramH, 'u_kernel[0]');
+
+  // Blur V uniforms
+  const uTempTex = gl.getUniformLocation(blurProgramV, 'u_tex');
+  const uBlurCanvasSizeV = gl.getUniformLocation(blurProgramV, 'u_canvasSize');
+  const uBlurDirPxV = gl.getUniformLocation(blurProgramV, 'u_directionPx');
+  const uBlurRadiusV = gl.getUniformLocation(blurProgramV, 'u_radius');
+  const uBlurKernelV = gl.getUniformLocation(blurProgramV, 'u_kernel[0]');
+
+  // Compose uniforms
+  const uBlurTex = gl.getUniformLocation(composeProgram, 'u_blurTex');
+  const uComposeCanvasSize = gl.getUniformLocation(composeProgram, 'u_canvasSize');
+  const uEdgeMapStartPx = gl.getUniformLocation(composeProgram, 'u_edgeMapStartPx');
+  const uEdgeMapMaxPx = gl.getUniformLocation(composeProgram, 'u_edgeMapMaxPx');
+  const uBorderRadiusPx = gl.getUniformLocation(composeProgram, 'u_borderRadiusPx');
+
+  // Full screen quad
+  const vbo = gl.createBuffer();
+  gl.bindBuffer(gl.ARRAY_BUFFER, vbo);
+  gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([
+    -1, -1,  1, -1,  -1, 1,
+    -1, 1,   1, -1,   1, 1,
+  ]), gl.STATIC_DRAW);
+  gl.enableVertexAttribArray(aPos);
+  gl.vertexAttribPointer(aPos, 2, gl.FLOAT, false, 0, 0);
+
+  // Source image texture (TEXTURE0)
+  const imageTex = gl.createTexture();
+  gl.activeTexture(gl.TEXTURE0);
+  gl.bindTexture(gl.TEXTURE_2D, imageTex);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+  gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 1, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE, new Uint8Array([0,0,0,0]));
+
+  // Temp texture (TEXTURE2) + FBO for horizontal blur output
+  const tempTex = gl.createTexture();
+  gl.activeTexture(gl.TEXTURE2);
+  gl.bindTexture(gl.TEXTURE_2D, tempTex);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+  gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 1, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
+  const tempFbo = gl.createFramebuffer();
+  gl.bindFramebuffer(gl.FRAMEBUFFER, tempFbo);
+  gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, tempTex, 0);
+  gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+
+  // Blur output texture (TEXTURE1) + FBO for vertical blur output
+  const blurTex = gl.createTexture();
+  gl.activeTexture(gl.TEXTURE1);
+  gl.bindTexture(gl.TEXTURE_2D, blurTex);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+  gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 1, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
+  const fbo = gl.createFramebuffer();
+  gl.bindFramebuffer(gl.FRAMEBUFFER, fbo);
+  gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, blurTex, 0);
+  gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+
+  // Set sampler uniforms (static)
+  gl.useProgram(blurProgramH); gl.uniform1i(uImage, 0);
+  gl.useProgram(blurProgramV); gl.uniform1i(uTempTex, 2);
+  gl.useProgram(composeProgram); gl.uniform1i(uBlurTex, 1);
+
+  let lastCanvasW = 0, lastCanvasH = 0;
+  let blurW = 1, blurH = 1;
+  let imageNaturalW = 0, imageNaturalH = 0;
+  const BLUR_DOWNSCALE = 1.0;
+
+  function setImage(img) {
+    imageNaturalW = img.naturalWidth || img.width;
+    imageNaturalH = img.naturalHeight || img.height;
+    gl.activeTexture(gl.TEXTURE0);
+    gl.bindTexture(gl.TEXTURE_2D, imageTex);
+    gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, 0);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, img);
+  }
+
+  function resize(widthCssPx, heightCssPx, dpr) {
+    const w = Math.max(1, Math.round(widthCssPx * dpr));
+    const h = Math.max(1, Math.round(heightCssPx * dpr));
+    if (w === lastCanvasW && h === lastCanvasH) return;
+    lastCanvasW = w; lastCanvasH = h;
+    canvas.width = w; canvas.height = h;
+
+    blurW = Math.max(1, Math.round(w * BLUR_DOWNSCALE));
+    blurH = Math.max(1, Math.round(h * BLUR_DOWNSCALE));
+
+    gl.activeTexture(gl.TEXTURE2);
+    gl.bindTexture(gl.TEXTURE_2D, tempTex);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, blurW, blurH, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
+
+    gl.activeTexture(gl.TEXTURE1);
+    gl.bindTexture(gl.TEXTURE_2D, blurTex);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, blurW, blurH, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
+
+    gl.viewport(0, 0, w, h);
+  }
+
+  function render(params) {
+    const blurRadiusPx = params.blurRadiusPx ?? 12;
+    const edgeMapStartPx = params.edgeMapStartPx ?? 24;
+    const edgeMapMaxPx = params.edgeMapMaxPx ?? 0;
+    const borderRadiusPx = params.borderRadiusPx ?? 0;
+
+    // object-fit: cover math
+    const containerW = params.containerSizePx.x;
+    const containerH = params.containerSizePx.y;
+    let drawW = containerW, drawH = containerH;
+    let offsetX = 0, offsetY = 0;
+    if (imageNaturalW > 0 && imageNaturalH > 0 && containerW > 0 && containerH > 0) {
+      const scale = Math.max(containerW / imageNaturalW, containerH / imageNaturalH);
+      drawW = imageNaturalW * scale;
+      drawH = imageNaturalH * scale;
+      offsetX = (containerW - drawW) * 0.5;
+      offsetY = (containerH - drawH) * 0.5;
+    }
+
+    const { radius: kernelRadius, kernel } = buildGaussianKernel(blurRadiusPx * params.dpr);
+
+    // Pass 1: Horizontal blur (source → tempTex)
+    gl.bindFramebuffer(gl.FRAMEBUFFER, tempFbo);
+    gl.viewport(0, 0, blurW, blurH);
+    gl.disable(gl.BLEND);
+    gl.clearColor(0, 0, 0, 1);
+    gl.clear(gl.COLOR_BUFFER_BIT);
+    gl.useProgram(blurProgramH);
+    gl.uniform2f(uBlurCanvasSize, canvas.width, canvas.height);
+    gl.uniform2f(uBlurCapsuleTopLeft, params.capsuleTopLeftPx.x * params.dpr, params.capsuleTopLeftPx.y * params.dpr);
+    gl.uniform2f(uBlurImageOffset, offsetX * params.dpr, offsetY * params.dpr);
+    gl.uniform2f(uBlurImageDrawSize, drawW * params.dpr, drawH * params.dpr);
+    gl.uniform2f(uBlurDirPxH, 1, 0);
+    gl.uniform1i(uBlurRadiusH, kernelRadius);
+    gl.uniform1fv(uBlurKernelH, kernel);
+    gl.drawArrays(gl.TRIANGLES, 0, 6);
+
+    // Pass 2: Vertical blur (tempTex → blurTex)
+    gl.bindFramebuffer(gl.FRAMEBUFFER, fbo);
+    gl.viewport(0, 0, blurW, blurH);
+    gl.disable(gl.BLEND);
+    gl.clearColor(0, 0, 0, 1);
+    gl.clear(gl.COLOR_BUFFER_BIT);
+    gl.useProgram(blurProgramV);
+    gl.uniform2f(uBlurCanvasSizeV, canvas.width, canvas.height);
+    gl.uniform2f(uBlurDirPxV, 0, 1);
+    gl.uniform1i(uBlurRadiusV, kernelRadius);
+    gl.uniform1fv(uBlurKernelV, kernel);
+    gl.drawArrays(gl.TRIANGLES, 0, 6);
+
+    // Pass 3: Compose with SDF edge refraction (blurTex → screen)
+    gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+    gl.viewport(0, 0, canvas.width, canvas.height);
+    gl.disable(gl.BLEND);
+    gl.clearColor(0, 0, 0, 1);
+    gl.clear(gl.COLOR_BUFFER_BIT);
+    gl.useProgram(composeProgram);
+    gl.uniform2f(uComposeCanvasSize, canvas.width, canvas.height);
+    gl.uniform1f(uEdgeMapStartPx, edgeMapStartPx * params.dpr);
+    gl.uniform1f(uEdgeMapMaxPx, edgeMapMaxPx * params.dpr);
+    gl.uniform1f(uBorderRadiusPx, Math.max(0, borderRadiusPx) * params.dpr);
+    gl.drawArrays(gl.TRIANGLES, 0, 6);
+  }
+
+  function dispose() {
+    gl.deleteTexture(imageTex);
+    gl.deleteTexture(tempTex);
+    gl.deleteTexture(blurTex);
+    gl.deleteFramebuffer(tempFbo);
+    gl.deleteFramebuffer(fbo);
+    gl.deleteBuffer(vbo);
+    gl.deleteProgram(blurProgramH);
+    gl.deleteProgram(blurProgramV);
+    gl.deleteProgram(composeProgram);
+  }
+
+  return { setImage, resize, render, dispose };
+}
+
+// ==================== 液态玻璃初始化 ====================
+const glassPanels = [];
+let glassInitialized = false;
+let glassRafPending = false;
+
+function initLiquidGlass() {
+  const bgImg = document.getElementById('bgImage');
+  if (!bgImg || !bgImg.complete || bgImg.naturalWidth === 0) return;
+
+  // 收集所有带 .glass-canvas 的面板
+  const panels = document.querySelectorAll('.glass');
+  panels.forEach(panel => {
+    const canvas = panel.querySelector('.glass-canvas');
+    if (!canvas || panel._glassRenderer) return;
+    try {
+      const renderer = createLiquidGlassRenderer(canvas);
+      renderer.setImage(bgImg);
+      panel._glassRenderer = renderer;
+      glassPanels.push(panel);
+    } catch (e) {
+      // WebGL 不可用，启用 CSS 兜底
+      panel.classList.add('css-fallback');
+    }
+  });
+
+  if (glassPanels.length > 0) {
+    glassInitialized = true;
+    renderAllGlass();
+  }
+}
+
+// 液态玻璃可调参数
+let glassBlur = '4';
+let glassEdgeStart = '1.00';
+let glassEdgeMax = '100';
+
+function renderAllGlass() {
+  if (!glassInitialized) return;
+  const bgImg = document.getElementById('bgImage');
+  if (!bgImg) return;
+
+  const bgRect = bgImg.getBoundingClientRect();
+  const dpr = Math.min(2, window.devicePixelRatio || 1);
+
+  glassPanels.forEach(panel => {
+    const renderer = panel._glassRenderer;
+    if (!renderer) return;
+
+    const rect = panel.getBoundingClientRect();
+    const w = rect.width, h = rect.height;
+    if (w <= 0 || h <= 0) return;
+
+    // 解析 border-radius
+    const cs = window.getComputedStyle(panel);
+    const parseRadius = (val) => {
+      const s = val.trim();
+      if (s.endsWith('%')) return (parseFloat(s) / 100) * Math.min(w, h);
+      return parseFloat(s) || 0;
+    };
+    const br = Math.max(
+      parseRadius(cs.borderTopLeftRadius),
+      parseRadius(cs.borderTopRightRadius),
+      parseRadius(cs.borderBottomRightRadius),
+      parseRadius(cs.borderBottomLeftRadius)
+    );
+    const edgeStart01 = parseFloat(glassEdgeStart);
+    const edgeMapStartPx = Math.min(br, edgeStart01 * br);
+
+    const topLeft = {
+      x: rect.left - bgRect.left,
+      y: rect.top - bgRect.top,
+    };
+
+    renderer.resize(w, h, dpr);
+    renderer.render({
+      dpr,
+      containerSizePx: { x: bgRect.width, y: bgRect.height },
+      capsuleTopLeftPx: topLeft,
+      capsuleSizePx: { x: w, y: h },
+      blurRadiusPx: parseInt(glassBlur),
+      edgeMapStartPx: edgeMapStartPx,
+      edgeMapMaxPx: parseInt(glassEdgeMax),
+      borderRadiusPx: br,
+    });
+  });
+}
+
+function scheduleGlassRender() {
+  if (glassRafPending) return;
+  glassRafPending = true;
+  requestAnimationFrame(() => {
+    glassRafPending = false;
+    renderAllGlass();
+  });
+}
+
+// 图片加载完成后初始化
+const bgImageEl = document.getElementById('bgImage');
+if (bgImageEl.complete && bgImageEl.naturalWidth > 0) {
+  initLiquidGlass();
+} else {
+  bgImageEl.addEventListener('load', initLiquidGlass, { once: true });
+}
+
+// 延迟多次渲染，修正初始加载时布局未稳定导致的 WebGL 尺寸偏差
+window.addEventListener('load', () => {
+  scheduleGlassRender();
+  setTimeout(scheduleGlassRender, 300);
+  setTimeout(scheduleGlassRender, 800);
+  setTimeout(scheduleGlassRender, 1500);
+});
+
+// 滚动/缩放时重新渲染
+window.addEventListener('scroll', scheduleGlassRender, { passive: true });
+window.addEventListener('resize', scheduleGlassRender);
+
+// 监听模态框显示/隐藏以触发渲染
+const redeemModal = document.getElementById('redeemModal');
+if (redeemModal) {
+  const modalObserver = new MutationObserver(scheduleGlassRender);
+  modalObserver.observe(redeemModal, { attributes: true, attributeFilter: ['class'] });
+}
+
+// 预览面板显示/隐藏触发渲染
+const previewCard = document.getElementById('previewCard');
+if (previewCard) {
+  const previewObserver = new MutationObserver(scheduleGlassRender);
+  previewObserver.observe(previewCard, { attributes: true, attributeFilter: ['style'] });
+}
+
+// ==================== 新手引导 ====================
+const guideOverlay = document.getElementById('guideOverlay');
+
+function openGuide() {
+  guideOverlay.classList.add('show');
+  // 等待 DOM 更新后触发液态玻璃渲染
+  setTimeout(() => scheduleGlassRender(), 150);
+}
+
+function closeGuide() {
+  guideOverlay.classList.remove('show');
+  // 记住「不再显示」
+  if (document.getElementById('dismissGuide').checked) {
+    localStorage.setItem('guide_dismissed', '1');
+  }
+}
+
+document.getElementById('helpBtn').addEventListener('click', openGuide);
+guideOverlay.addEventListener('click', e => {
+  if (e.target === e.currentTarget) closeGuide();
+});
+
+// 首次访问自动弹出（localStorage 未记录 dismiss 时）
+if (!localStorage.getItem('guide_dismissed')) {
+  setTimeout(openGuide, 800);
+}
+
+// ==================== 状态 ====================
+const images = new Array(9).fill(null);
+const imagesFullRes = new Array(9).fill(null); // 全分辨率原始图像，下载时使用
+const templates = {};
+let selectedTemplate = '';
+let templateOverlays = {};
+let coloredOverlays = null;
+let coloredCache = null;
+let trailColor = '#dc3232';
+let trailWidth = 2;
+let keepOriginalRatio = true; // true=保持原图比例(轨迹叠中心1:1) / false=裁切为1:1正方形(轨迹铺满)
+const CELL_MAX = 800;
+
+
+// ==================== 模板轮播 ====================
+let currentScrollIdx = 0;
+
+function renderTemplateList() {
+  const list = document.getElementById('templateList');
+  list.innerHTML = '';
+  for (const [key, t] of Object.entries(templates)) {
+    const item = document.createElement('div');
+    item.className = 'tpl-item' + (selectedTemplate === key ? ' selected' : '') + (t.isUploaded ? ' uploaded' : '');
+    item.dataset.tplKey = key;
+    item.dataset.tplName = t.name.toLowerCase();
+    item.onclick = () => selectTemplate(key);
+    const thumbSrc = t.isCustom && t.cells ? t.cells[4] : templateFileUrl(key, 'grid_2_2.png');
+    const safeName = escHtmlTpl(t.name);
+    item.innerHTML = `
+      <img src="${thumbSrc}" alt="${safeName}" loading="lazy">
+      <div class="tpl-name">${safeName}</div>
+    `;
+    list.appendChild(item);
+  }
+  requestAnimationFrame(() => scrollToSelectedItem());
+}
+
+function scrollToSelectedItem() {
+  const list = document.getElementById('templateList');
+  const item = list.querySelector('.tpl-item.selected');
+  if (item) {
+    item.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+  }
+}
+
+function escHtmlTpl(s) {
+  const d = document.createElement('div');
+  d.textContent = s;
+  return d.innerHTML;
+}
+
+function templateFileUrl(key, fileName) {
+  return `/templates/${encodeURIComponent(key)}/${fileName}`;
+}
+
+function toTemplateFolderName(name) {
+  return String(name || '')
+    .trim()
+    .replace(/[<>:"/\\|?*\x00-\x1F]/g, '_')
+    .replace(/\s+/g, ' ')
+    .slice(0, 120)
+    .trim();
+}
+
+function nextTemplateKey(baseKey, existingKeys) {
+  if (!existingKeys.has(baseKey)) return baseKey;
+  for (let i = 2; i < 1000; i++) {
+    const key = `${baseKey}（${i}）`;
+    if (!existingKeys.has(key)) return key;
+  }
+  return '';
+}
+
+function updateListSelection(key) {
+  const list = document.getElementById('templateList');
+  list.querySelectorAll('.tpl-item').forEach(el => {
+    el.classList.toggle('selected', el.dataset.tplKey === key);
+  });
+  scrollToSelectedItem();
+}
+
+function filterTemplates(query) {
+  const list = document.getElementById('templateList');
+  const q = query.toLowerCase().trim();
+  list.querySelectorAll('.tpl-item').forEach(el => {
+    const match = !q || el.dataset.tplName.includes(q);
+    el.classList.toggle('hidden-by-search', !match);
+  });
+  updateNoResults();
+}
+
+function updateNoResults() {
+  const list = document.getElementById('templateList');
+  const noResults = document.getElementById('noResults');
+  const visible = list.querySelectorAll('.tpl-item:not(.hidden-by-search)').length;
+  noResults.style.display = visible === 0 ? 'block' : 'none';
+}
+
+// ==================== 预加载轨迹叠层 ====================
+function preloadOverlays(key) {
+  const tpl = templates[key];
+  // 自定义模板：从 dataURL 加载
+  if (tpl && tpl.isCustom && tpl.cells) {
+    return Promise.all(tpl.cells.map(dataUrl => {
+      return new Promise(resolve => {
+        const img = new Image();
+        img.onload = () => resolve(img);
+        img.onerror = () => resolve(null);
+        img.src = dataUrl;
+      });
+    }));
+  }
+  // 预置模板：从服务器加载
+  return Promise.all(
+    ['1_1','1_2','1_3','2_1','2_2','2_3','3_1','3_2','3_3'].map(slot => {
+      return new Promise(resolve => {
+        const img = new Image();
+        img.crossOrigin = 'anonymous';
+        img.onload = () => resolve(img);
+        img.onerror = () => resolve(null);
+        img.src = `${templateFileUrl(key, `grid_${slot}.png`)}?t=${Date.now()}`;
+      });
+    })
+  );
+}
+
+// ==================== 轨迹颜色重着色 ====================
+function recolorOverlay(originalImg, hexColor) {
+  if (!originalImg || !originalImg.complete || originalImg.naturalWidth === 0) {
+    return null;
+  }
+  const r = parseInt(hexColor.slice(1, 3), 16);
+  const g = parseInt(hexColor.slice(3, 5), 16);
+  const b = parseInt(hexColor.slice(5, 7), 16);
+
+  const canvas = document.createElement('canvas');
+  canvas.width = originalImg.naturalWidth;
+  canvas.height = originalImg.naturalHeight;
+  const ctx = canvas.getContext('2d');
+  ctx.drawImage(originalImg, 0, 0);
+
+  const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+  const pixels = imageData.data;
+  for (let i = 0; i < pixels.length; i += 4) {
+    if (pixels[i + 3] > 0) {
+      pixels[i]     = r;
+      pixels[i + 1] = g;
+      pixels[i + 2] = b;
+    }
+  }
+  ctx.putImageData(imageData, 0, 0);
+  return canvas; // 直接返回 Canvas，省掉 dataURL→Image 的转换
+}
+
+// Canvas 像素级膨胀/腐蚀（改变线条粗细）
+function adjustLineWidth(sourceImg, scale) {
+  if (!sourceImg || scale === 1.0) return sourceImg;
+
+  const srcW = sourceImg.naturalWidth || sourceImg.width;
+  const srcH = sourceImg.naturalHeight || sourceImg.height;
+  const srcCanvas = document.createElement('canvas');
+  srcCanvas.width = srcW;
+  srcCanvas.height = srcH;
+  const srcCtx = srcCanvas.getContext('2d');
+  srcCtx.drawImage(sourceImg, 0, 0);
+  const srcData = srcCtx.getImageData(0, 0, srcCanvas.width, srcCanvas.height);
+  const sp = srcData.data;
+  const sw = srcCanvas.width, sh = srcCanvas.height;
+
+  const outCanvas = document.createElement('canvas');
+  outCanvas.width = sw; outCanvas.height = sh;
+  const outCtx = outCanvas.getContext('2d');
+  const outData = outCtx.createImageData(sw, sh);
+  const op = outData.data;
+
+  if (scale > 1.0) {
+    // 膨胀
+    const radius = Math.round((scale - 1.0) * 4);
+    for (let y = 0; y < sh; y++) {
+      for (let x = 0; x < sw; x++) {
+        const idx = (y * sw + x) * 4;
+        if (sp[idx + 3] > 0) {
+          op[idx] = sp[idx]; op[idx+1] = sp[idx+1]; op[idx+2] = sp[idx+2]; op[idx+3] = 255;
+        } else {
+          let found = false;
+          for (let dy = -radius; dy <= radius && !found; dy++) {
+            for (let dx = -radius; dx <= radius && !found; dx++) {
+              if (dx*dx + dy*dy > radius*radius) continue;
+              const nx = x + dx, ny = y + dy;
+              if (nx < 0 || nx >= sw || ny < 0 || ny >= sh) continue;
+              if (sp[(ny * sw + nx) * 4 + 3] > 0) found = true;
+            }
+          }
+          if (found) {
+            let r = 0, g = 0, b = 0, cnt = 0;
+            for (let dy = -radius; dy <= radius; dy++) {
+              for (let dx = -radius; dx <= radius; dx++) {
+                if (dx*dx + dy*dy > radius*radius) continue;
+                const nx = x + dx, ny = y + dy;
+                if (nx < 0 || nx >= sw || ny < 0 || ny >= sh) continue;
+                if (sp[(ny * sw + nx) * 4 + 3] > 0) {
+                  r += sp[(ny * sw + nx) * 4];
+                  g += sp[(ny * sw + nx) * 4 + 1];
+                  b += sp[(ny * sw + nx) * 4 + 2];
+                  cnt++;
+                }
+              }
+            }
+            op[idx] = r/cnt; op[idx+1] = g/cnt; op[idx+2] = b/cnt; op[idx+3] = 255;
+          }
+        }
+      }
+    }
+  } else {
+    // 腐蚀
+    const radius = Math.round((1.0 - scale) * 4);
+    for (let y = 0; y < sh; y++) {
+      for (let x = 0; x < sw; x++) {
+        const idx = (y * sw + x) * 4;
+        if (sp[idx + 3] === 0) continue;
+        let hasTransparent = false;
+        for (let dy = -radius; dy <= radius && !hasTransparent; dy++) {
+          for (let dx = -radius; dx <= radius && !hasTransparent; dx++) {
+            if (dx*dx + dy*dy > radius*radius) continue;
+            const nx = x + dx, ny = y + dy;
+            if (nx < 0 || nx >= sw || ny < 0 || ny >= sh) continue;
+            if (sp[(ny * sw + nx) * 4 + 3] === 0) hasTransparent = true;
+          }
+        }
+        if (hasTransparent) {
+          op[idx+3] = 0;
+        } else {
+          op[idx] = sp[idx]; op[idx+1] = sp[idx+1]; op[idx+2] = sp[idx+2]; op[idx+3] = 255;
+        }
+      }
+    }
+  }
+
+  outCtx.putImageData(outData, 0, 0);
+  return outCanvas;
+}
+
+// 对所有 9 张叠层重着色→调粗细（返回 Canvas，无需 async）
+function processOverlays() {
+  const originals = templateOverlays[selectedTemplate];
+  if (!originals) return;
+  coloredCache = originals.map(img => recolorOverlay(img, trailColor));
+  if (trailWidth !== 1.0) {
+    coloredOverlays = coloredCache.map(img => adjustLineWidth(img, trailWidth));
+  } else {
+    coloredOverlays = coloredCache;
+  }
+  updatePreview();
+}
+
+// 仅调粗细（返回 Canvas，无需 async）
+function applyTrailWidth(width) {
+  trailWidth = width;
+  if (!coloredCache) return;
+  if (width !== 1.0) {
+    coloredOverlays = coloredCache.map(img => adjustLineWidth(img, width));
+  } else {
+    coloredOverlays = coloredCache;
+  }
+  updatePreview();
+}
+
+// 防抖
+function debounce(fn, delay) {
+  let timer = null;
+  return function(...args) {
+    clearTimeout(timer);
+    timer = setTimeout(() => fn.apply(this, args), delay);
+  };
+}
+
+const debouncedProcess = debounce(processOverlays, 200);
+const debouncedWidth = debounce(applyTrailWidth, 100);
+
+function getActiveOverlays() {
+  return coloredOverlays || templateOverlays[selectedTemplate];
+}
+
+// ==================== 模板切换 ====================
+async function selectTemplate(key) {
+  if (selectedTemplate === key && templateOverlays[key]) return;
+  selectedTemplate = key;
+  updateListSelection(key);
+  if (!templateOverlays[key]) {
+    templateOverlays[key] = await preloadOverlays(key);
+  }
+  await processOverlays();
+}
+
+// Coloris 初始化
+Coloris({
+  el: '#trailColorPicker',
+  theme: 'large',
+  themeMode: 'dark',
+  alpha: false,
+  format: 'hex',
+  focusInput: false,
+  selectInput: false,
+  margin: 4,
+  swatches: ['#DC3232','#FF6B35','#FFD700','#4ade80','#60a5fa','#a78bfa','#f472b6','#ffffff'],
+});
+
+// 色盘事件（Coloris 也会触发 input 事件）
+document.getElementById('trailColorPicker').addEventListener('input', (e) => {
+  const color = e.target.value;
+  document.getElementById('trailColorHex').textContent = color;
+  trailColor = color;
+  debouncedProcess();
+});
+
+// 粗细事件
+document.getElementById('trailWidthSlider').addEventListener('input', (e) => {
+  const width = parseFloat(e.target.value);
+  document.getElementById('trailWidthVal').textContent = width.toFixed(1);
+  trailWidth = width;
+
+  // 埋点：轨迹线宽调整（防抖，1秒后发送最终值）
+  window._tracker?.trackInteraction('adjust_trail_width', { width });
+  debouncedWidth(width);
+});
+
+// 裁切方式切换：勾选=保持原图比例，取消=裁切为1:1
+document.getElementById('keepRatioToggle').addEventListener('change', (e) => {
+  keepOriginalRatio = e.target.checked;
+  document.getElementById('ratioToggleText').textContent = keepOriginalRatio ? '保持原图' : '裁切1:1';
+  updatePreview();
+});
+
+// 帮助问号悬停提示（用 fixed 元素挂 body，避开玻璃面板的 overflow:hidden 裁切）
+(function initHelpTips() {
+  const tip = document.createElement('div');
+  tip.id = 'hoverTip';
+  document.body.appendChild(tip);
+  let hideTimer = null;
+  function showTip(el) {
+    const txt = el.getAttribute('data-tip');
+    if (!txt) return;
+    tip.textContent = txt;
+    const r = el.getBoundingClientRect();
+    let left = r.left + r.width / 2;
+    const half = 110;
+    left = Math.max(half + 6, Math.min(window.innerWidth - half - 6, left));
+    tip.style.left = left + 'px';
+    tip.style.top = (r.top - 8) + 'px';
+    tip.classList.add('show');
+  }
+  function hideTip() { tip.classList.remove('show'); }
+  document.querySelectorAll('.help-dot').forEach(el => {
+    el.addEventListener('mouseenter', () => { clearTimeout(hideTimer); showTip(el); });
+    el.addEventListener('mouseleave', hideTip);
+    el.addEventListener('click', (ev) => {
+      ev.stopPropagation();
+      clearTimeout(hideTimer);
+      showTip(el);
+      hideTimer = setTimeout(hideTip, 3500);
+    });
+  });
+})();
+
+// ==================== 九宫格上传 ====================
+const gridEl = document.getElementById('grid9');
+let _sortable = null;
+
+function renderGrid() {
+  gridEl.innerHTML = '';
+  for (let i = 0; i < 9; i++) {
+    const cell = document.createElement('div');
+    cell.className = 'upload-cell' + (images[i] ? ' filled' : '');
+    cell.dataset.idx = i;
+    if (images[i]) {
+      cell.innerHTML = `<span class="idx-badge">${i+1}</span><img src="${images[i]}" alt="pic">`;
+    } else {
+      cell.innerHTML = '<span class="plus">+</span>';
+    }
+    cell.addEventListener('click', () => triggerSingleUpload(i));
+    gridEl.appendChild(cell);
+  }
+  if (_sortable) _sortable.destroy();
+  _sortable = new Sortable(gridEl, {
+    animation: 150,
+    ghostClass: 'sortable-ghost',
+    onEnd(evt) {
+      const moved = images.splice(evt.oldIndex, 1)[0];
+      images.splice(evt.newIndex, 0, moved);
+      const movedFull = imagesFullRes.splice(evt.oldIndex, 1)[0];
+      imagesFullRes.splice(evt.newIndex, 0, movedFull);
+      renderGrid();
+      updatePreview();
+    }
+  });
+}
+
+// 处理文件上传（自动识别 HEIC / 动态照片 / 普通图片）
+async function handleFileUpload(file, idx) {
+  const result = await autoConvertPhoto(file);
+  const reader = new FileReader();
+  reader.onload = (e) => processImage(e.target.result, idx);
+  reader.readAsDataURL(result.blob);
+}
+
+function triggerSingleUpload(idx) {
+  const input = document.createElement('input');
+  input.type = 'file'; input.accept = 'image/*,.heic,.heif';
+  input.onchange = () => {
+    if (!input.files[0]) return;
+    handleFileUpload(input.files[0], idx);
+  };
+  input.click();
+}
+
+function handleBatchUpload(event) {
+  const files = Array.from(event.target.files);
+  let next = images.findIndex(v => v === null);
+  if (next === -1) return;
+  files.forEach(file => {
+    if (next >= 9) return;
+    const idx = next++;
+    handleFileUpload(file, idx);
+  });
+  event.target.value = '';
+}
+
+function processImage(dataUrl, idx) {
+  const img = new Image();
+  img.onload = () => {
+    const w = img.naturalWidth, h = img.naturalHeight;
+
+    // 存储原始 dataURL（下载用，不做任何二次编码，保持原始像素不压缩）
+    imagesFullRes[idx] = dataUrl;
+
+    // 缩略版用于九宫格预览（节省内存，渲染更快）
+    const maxSide = Math.max(w, h);
+    const scale = Math.min(1, CELL_MAX / maxSide);
+    const outW = Math.round(w * scale), outH = Math.round(h * scale);
+    const canvas = document.createElement('canvas');
+    canvas.width = outW; canvas.height = outH;
+    const ctx = canvas.getContext('2d');
+    ctx.drawImage(img, 0, 0, outW, outH);
+    images[idx] = canvas.toDataURL('image/jpeg', 0.95);
+
+    renderGrid();
+    updatePreview();
+  };
+  img.src = dataUrl;
+}
+
+function clearAll() {
+  document.getElementById('confirmToast').classList.add('show');
+}
+function closeConfirmToast() {
+  document.getElementById('confirmToast').classList.remove('show');
+}
+function doClearAll() {
+  for (let i = 0; i < 9; i++) { images[i] = null; imagesFullRes[i] = null; }
+  imageCache.clear();
+  renderGrid();
+  updatePreview();
+  document.getElementById('confirmToast').classList.remove('show');
+}
+
+// ==================== 拖拽上传 ====================
+function initDragDrop() {
+  const grid = document.getElementById('grid9');
+  const panel = document.getElementById('uploadPanel');
+  let dragCounter = 0;
+
+  panel.addEventListener('dragenter', e => {
+    e.preventDefault();
+    dragCounter++;
+    grid.classList.add('drag-over');
+  });
+  panel.addEventListener('dragleave', e => {
+    e.preventDefault();
+    dragCounter--;
+    if (dragCounter <= 0) {
+      dragCounter = 0;
+      grid.classList.remove('drag-over');
+    }
+  });
+  panel.addEventListener('dragover', e => {
+    e.preventDefault();
+  });
+  panel.addEventListener('drop', e => {
+    e.preventDefault();
+    dragCounter = 0;
+    grid.classList.remove('drag-over');
+    const files = Array.from(e.dataTransfer.files).filter(f =>
+      f.type.startsWith('image/') || /\.(heic|heif|jpg|jpeg|png|webp)$/i.test(f.name)
+    );
+    let next = images.findIndex(v => v === null);
+    if (next === -1) return;
+    files.forEach(file => {
+      if (next >= 9) return;
+      handleFileUpload(file, next++);
+    });
+  });
+}
+
+// ==================== 合成预览 ====================
+const PREVIEW_SIZE = 300;
+// 缓存已加载的 Image 对象，避免重复加载
+const imageCache = new Map();
+
+function cachedLoadImage(src) {
+  if (imageCache.has(src)) return Promise.resolve(imageCache.get(src));
+  return loadImage(src).then(img => { imageCache.set(src, img); return img; });
+}
+
+function updatePreview() {
+  const anyFilled = images.some(v => v !== null);
+  const allFilled = images.every(v => v !== null);
+  const card = document.getElementById('previewCard');
+  if (!anyFilled) { card.style.display = 'none'; return; }
+  card.style.display = '';
+  scheduleGlassRender();
+
+  const btnDownload = document.getElementById('btnDownload');
+  if (allFilled) {
+    btnDownload.disabled = false;
+    btnDownload.style.opacity = '1';
+    btnDownload.title = '';
+  } else {
+    btnDownload.disabled = true;
+    btnDownload.style.opacity = '0.4';
+    btnDownload.title = '需要上传全部 9 张照片才能下载';
+  }
+
+  const overlays = getActiveOverlays();
+  if (!overlays) return;
+
+  const previewGrid = document.getElementById('previewGrid');
+  previewGrid.innerHTML = '';
+
+  for (let i = 0; i < 9; i++) {
+    if (images[i]) {
+      const canvas = document.createElement('canvas');
+      canvas.width = PREVIEW_SIZE; canvas.height = PREVIEW_SIZE;
+      previewGrid.appendChild(canvas);
+      drawCellCached(canvas, images[i], overlays[i], true);
+    } else {
+      const placeholder = document.createElement('div');
+      placeholder.className = 'preview-cell-placeholder';
+      placeholder.textContent = '?';
+      previewGrid.appendChild(placeholder);
+    }
+  }
+}
+
+function drawCellCached(canvas, userDataUrl, overlayImg, watermark) {
+  cachedLoadImage(userDataUrl).then(userImg => {
+    try {
+      const ctx = canvas.getContext('2d');
+      const cw = canvas.width, ch = canvas.height;
+      const iw = userImg.naturalWidth || userImg.width;
+      const ih = userImg.naturalHeight || userImg.height;
+      ctx.clearRect(0, 0, cw, ch);
+      if (keepOriginalRatio) {
+        // 保持原图比例：完整等比缩放进画布（contain，可能留白），轨迹叠在中心 1:1 区域
+        const s = Math.min(cw / iw, ch / ih);
+        const dw = iw * s, dh = ih * s;
+        const dx = (cw - dw) / 2, dy = (ch - dh) / 2;
+        ctx.drawImage(userImg, dx, dy, dw, dh);
+        if (overlayImg) {
+          const sideDisp = Math.min(dw, dh);
+          const ox = (cw - sideDisp) / 2, oy = (ch - sideDisp) / 2;
+          try { ctx.drawImage(overlayImg, ox, oy, sideDisp, sideDisp); } catch (e) {}
+        }
+      } else {
+        // 裁切 1:1：居中裁剪正方形铺满画布，轨迹铺满（模拟微信九宫格效果）
+        const side = Math.min(iw, ih);
+        const sx = (iw - side) / 2, sy = (ih - side) / 2;
+        ctx.drawImage(userImg, sx, sy, side, side, 0, 0, cw, ch);
+        if (overlayImg) {
+          try { ctx.drawImage(overlayImg, 0, 0, cw, ch); } catch (e) {}
+        }
+      }
+      if (watermark) {
+        ctx.save(); ctx.translate(cw/2, ch/2); ctx.rotate(-25*Math.PI/180);
+        ctx.font = 'bold 12px "Nunito","PingFang SC",sans-serif';
+        ctx.fillStyle = 'rgba(255,255,255,0.25)'; ctx.textAlign = 'center';
+        for (let r = -2; r <= 2; r++) ctx.fillText('预览版 - 兑换后下载', 0, r*40);
+        ctx.restore();
+      }
+    } catch (e) {}
+  }).catch(() => {});
+}
+
+function loadImage(src) {
+  return new Promise((resolve, reject) => {
+    if (src instanceof Image && src.complete && src.naturalWidth > 0) {
+      resolve(src); return;
+    }
+    const img = new Image();
+    img.onload = () => resolve(img);
+    img.onerror = () => reject(new Error('图片加载失败'));
+    img.src = src instanceof Image ? src.src : src;
+  });
+}
+
+async function drawComposite(canvas, userDataUrl, overlayImg, watermark) {
+  try {
+    const ctx = canvas.getContext('2d');
+    const w = canvas.width, h = canvas.height;
+    const userImg = await loadImage(userDataUrl);
+    ctx.drawImage(userImg, 0, 0, w, h);
+    if (overlayImg) {
+      try {
+        const ol = await loadImage(overlayImg);
+        ctx.drawImage(ol, 0, 0, w, h);
+      } catch (e) {}
+    }
+    if (watermark) {
+      ctx.save();
+      ctx.translate(w/2, h/2);
+      ctx.rotate(-25 * Math.PI / 180);
+      ctx.font = 'bold 16px "Nunito","PingFang SC",sans-serif';
+      ctx.fillStyle = 'rgba(255,255,255,0.3)';
+      ctx.textAlign = 'center';
+      for (let r = -2; r <= 2; r++) ctx.fillText('预览版 - 兑换后下载', 0, r * 50);
+      ctx.restore();
+    }
+    ctx.globalAlpha = 0.999;
+    ctx.globalAlpha = 1.0;
+  } catch (e) {}
+}
+
+// ==================== 高清合成 ====================
+async function compositeHighRes(userDataUrl, overlayImg) {
+  const userImg = new Image();
+  userImg.src = userDataUrl;
+  await new Promise(r => { if (userImg.complete) r(); else userImg.onload = r; });
+  const iw = userImg.naturalWidth, ih = userImg.naturalHeight;
+  const canvas = document.createElement('canvas');
+  const ctx = canvas.getContext('2d');
+  if (keepOriginalRatio) {
+    // 保持原图比例，不裁切；轨迹叠加在画面正中间的 1:1 方形区域内
+    canvas.width = iw; canvas.height = ih;
+    ctx.drawImage(userImg, 0, 0, iw, ih);
+    if (overlayImg) {
+      const side = Math.min(iw, ih);
+      const ox = (iw - side) / 2, oy = (ih - side) / 2;
+      try { ctx.drawImage(overlayImg, ox, oy, side, side); } catch (e) {}
+    }
+  } else {
+    // 裁切为 1:1 正方形（居中裁剪），轨迹铺满整张
+    const side = Math.min(iw, ih);
+    const sx = (iw - side) / 2, sy = (ih - side) / 2;
+    canvas.width = side; canvas.height = side;
+    ctx.drawImage(userImg, sx, sy, side, side, 0, 0, side, side);
+    if (overlayImg) {
+      try { ctx.drawImage(overlayImg, 0, 0, side, side); } catch (e) {}
+    }
+  }
+  return canvas;
+}
+
+// ==================== 下载 + 赞赏模态框 ====================
+
+// 下载限流：每 10 分钟最多 5 次
+const DL_LIMIT = 5;
+const DL_WINDOW = 600000;
+
+function checkDownloadAllowed() {
+  const now = Date.now();
+  let rec;
+  try {
+    rec = JSON.parse(localStorage.getItem('dl_limit')) || { count: 0, start: 0 };
+  } catch (e) {
+    rec = { count: 0, start: 0 };
+  }
+  if (now - rec.start > DL_WINDOW) {
+    rec = { count: 0, start: now };
+    localStorage.setItem('dl_limit', JSON.stringify(rec));
+    return { ok: true };
+  }
+  if (rec.count >= DL_LIMIT) {
+    const remainMin = Math.ceil((DL_WINDOW - (now - rec.start)) / 60000);
+    return { ok: false, remainMin };
+  }
+  return { ok: true, rec };
+}
+
+function openDownloadModal() {
+  document.getElementById('downloadModal').classList.add('show');
+  document.getElementById('dlMsg').textContent = '';
+  document.getElementById('dlMsg').className = 'modal-msg';
+  scheduleGlassRender();
+}
+
+function closeDownloadModal() {
+  document.getElementById('downloadModal').classList.remove('show');
+}
+
+document.getElementById('downloadModal').addEventListener('click', e => {
+  if (e.target === e.currentTarget) closeDownloadModal();
+});
+
+async function doDownload() {
+  const msg = document.getElementById('dlMsg');
+
+  // 限流检查
+  const check = checkDownloadAllowed();
+  if (!check.ok) {
+    msg.textContent = '下载太频繁，请 ' + check.remainMin + ' 分钟后再试';
+    msg.className = 'modal-msg error';
+    return;
+  }
+
+  msg.textContent = '正在生成高清图...';
+  msg.className = 'modal-msg success';
+
+  try {
+    const overlays = getActiveOverlays();
+    const zip = new JSZip();
+    await Promise.all(imagesFullRes.map(async (imgData, i) => {
+      if (!imgData) return; // 跳过空位
+      const canvas = await compositeHighRes(imgData, overlays[i]);
+      const blob = await new Promise(r => canvas.toBlob(r, 'image/png'));
+      zip.file(`旅行记忆_九宫格_${i + 1}.png`, blob);
+    }));
+    const zipBlob = await zip.generateAsync({ type: 'blob' });
+    const url = URL.createObjectURL(zipBlob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = '旅行记忆_九宫格.zip';
+    a.click();
+    URL.revokeObjectURL(url);
+
+    // 记录下载计数
+    if (check.rec) {
+      check.rec.count++;
+      localStorage.setItem('dl_limit', JSON.stringify(check.rec));
+    }
+
+    // 埋点：下载海报（兼容旧 trackEvent + 新版带文件信息）
+    const filledCount = imagesFullRes.filter(v => v !== null).length;
+    trackEvent('download');
+    window._tracker?.sendEvent('download_poster', {
+      image_count: filledCount,
+      zip_size_bytes: zipBlob.size,
+      overlays: overlays.length,
+    });
+
+    msg.textContent = '下载完成！';
+    setTimeout(closeDownloadModal, 1500);
+  } catch (err) {
+    msg.textContent = '生成失败，请重试';
+    msg.className = 'modal-msg error';
+  }
+}
+
+// 以下为旧兑换码逻辑（已隐藏，可通过 URL 参数 ?redeem=1 启用）
+if (new URLSearchParams(location.search).has('redeem')) {
+  console.log('[dev] 兑换码模式可通过 /api/redeem 接口使用');
+}
+
+// ==================== 数据统计埋点（已迁移至 Tracker 模块） ====================
+// window._tracker 由上方 <script type="module"> 初始化，自动上报 pageview + 活跃停留时长
+
+function trackEvent(action, value) {
+  // 旧接口兼容：转为新版 sendEvent，同时保留 /api/track 调用
+  window._tracker?.sendEvent(action, { value });
+  try {
+    const sid = window._tracker?.sessionId || '';
+    fetch('/api/track', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action, value, sid }),
+      keepalive: !!value,
+    }).catch(() => {});
+  } catch (e) {}
+}
+
+// ==================== 轨迹解析与模板生成 ====================
+// 使用 TrajectoryEngine（完全参考 GPXSee 架构）
+
+let _engine = null;
+function getEngine() { return _engine || (_engine = new TrajectoryEngine()); }
+
+async function parseTrackFile(file) {
+  const result = await getEngine().parse(file);
+  if (!result.ok) return null;
+  // 向后兼容：扁平化所有 tracks 的点
+  const flatPoints = [];
+  for (const track of result.tracks) {
+    for (const seg of track.segments)
+      for (const pt of seg) flatPoints.push({ lng: pt.lng, lat: pt.lat });
+  }
+  return {
+    points: flatPoints,
+    result: result,
+    format: result.tracks[0] ? 'KML' : '',
+    name: result.tracks[0] ? result.tracks[0].name : '',
+  };
+}
+
+// ==================== 渲染工具 ====================
+
+function smoothSegment(segment, targetCount) {
+  if (segment.length >= targetCount || segment.length < 3) return segment.slice();
+  const wrap = [...segment];
+  const f = segment[0], l = segment[segment.length - 1];
+  wrap.unshift({ lng: f.lng * 2 - segment[1].lng, lat: f.lat * 2 - segment[1].lat });
+  wrap.push({ lng: l.lng * 2 - segment[segment.length - 2].lng, lat: l.lat * 2 - segment[segment.length - 2].lat });
+  const per = Math.ceil(targetCount / (segment.length - 1));
+  const result = [];
+  for (let i = 1; i < wrap.length - 2; i++) {
+    const p0 = wrap[i-1], p1 = wrap[i], p2 = wrap[i+1], p3 = wrap[i+2];
+    const steps = (i === wrap.length - 3) ? 1 : per;
+    for (let t = 0; t < steps; t++) {
+      const tt = t / steps, tt2 = tt * tt, tt3 = tt2 * tt;
+      result.push({
+        lng: 0.5 * ((2*p1.lng) + (-p0.lng + p2.lng)*tt + (2*p0.lng - 5*p1.lng + 4*p2.lng - p3.lng)*tt2 + (-p0.lng + 3*p1.lng - 3*p2.lng + p3.lng)*tt3),
+        lat: 0.5 * ((2*p1.lat) + (-p0.lat + p2.lat)*tt + (2*p0.lat - 5*p1.lat + 4*p2.lat - p3.lat)*tt2 + (-p0.lat + 3*p1.lat - 3*p2.lat + p3.lat)*tt3)
+      });
+    }
+  }
+  if (result.length === 0) result.push(l);
+  return result;
+}
+
+function splitByLargeJumps(segments) {
+  if (segments.length <= 1) return segments;
+  const all = [];
+  for (const s of segments) { for (const pt of s) all.push(pt); }
+  const proj = all.map(p => ({ x: mercatorX(p.lng), y: mercatorY(p.lat) }));
+  const dists = [];
+  for (let i = 1; i < proj.length; i++)
+    dists.push(Math.hypot(proj[i].x - proj[i-1].x, proj[i].y - proj[i-1].y));
+  const sorted = dists.filter(d => d > 0).sort((a, b) => a - b);
+  if (!sorted.length) return segments;
+  const median = sorted[Math.floor(sorted.length / 2)];
+  const xs = proj.map(p => p.x), ys = proj.map(p => p.y);
+  const diagonal = Math.hypot(Math.max(...xs) - Math.min(...xs), Math.max(...ys) - Math.min(...ys));
+  const threshold = Math.max(median * 25, diagonal * 0.08);
+  const parts = [[all[0]]];
+  for (let i = 1; i < all.length; i++) {
+    const d = Math.hypot(proj[i].x - proj[i-1].x, proj[i].y - proj[i-1].y);
+    if (d > threshold && parts[parts.length - 1].length > 1) parts.push([]);
+    parts[parts.length - 1].push(all[i]);
+  }
+  return parts.filter(p => p.length > 1);
+}
+
+// ==================== Web Mercator 投影 ====================
+
+function mercatorX(lon) { return lon * (Math.PI / 180) * 6378137; }
+function mercatorY(lat) {
+  const rad = lat * (Math.PI / 180);
+  return 6378137 * Math.log(Math.tan(Math.PI / 4 + rad / 2));
+}
+
+// 渲染轨迹到 Canvas 并切割为 3x3 模板
+const CUSTOM_CELL_SIZE = 800;
+const CUSTOM_FULL_SIZE = CUSTOM_CELL_SIZE * 3;
+
+function renderTemplateCells(trackData) {
+  // 从 ParseResult 或 TrackData 中提取段
+  let segments;
+  if (trackData && trackData.tracks) {
+    // ParseResult: 遍历所有 TrackData 的所有 Segment
+    segments = [];
+    for (const track of trackData.tracks) {
+      for (const seg of track.segments) {
+        if (seg.length > 1) segments.push(Array.from(seg));
+      }
+    }
+  } else if (trackData && trackData.segments) {
+    segments = trackData.segments.map(s => Array.from(s));
+  } else if (Array.isArray(trackData)) {
+    segments = [trackData];
+  } else {
+    segments = [];
+  }
+  segments = splitByLargeJumps(segments);
+  const targetEach = Math.max(120, Math.ceil(500 / Math.max(1, segments.length)));
+  const smoothedSegments = segments.map(seg => smoothSegment(seg, targetEach));
+  const allPoints = smoothedSegments.flat();
+  if (!allPoints.length) return [];
+
+  const xs = allPoints.map(p => mercatorX(p.lng));
+  const ys = allPoints.map(p => mercatorY(p.lat));
+  const xMin = Math.min(...xs), xMax = Math.max(...xs);
+  const yMin = Math.min(...ys), yMax = Math.max(...ys);
+
+  const xRange = xMax - xMin || 1;
+  const yRange = yMax - yMin || 1;
+  const padX = xRange * 0.05, padY = yRange * 0.05;
+  const maxRange = Math.max(xRange, yRange);
+  const xCenter = (xMin + xMax) / 2;
+  const yCenter = (yMin + yMax) / 2;
+  const half = maxRange / 2 + Math.max(padX, padY);
+
+  const xLow = xCenter - half, xHigh = xCenter + half;
+  const yLow = yCenter - half, yHigh = yCenter + half;
+
+  const mapX = (mx) => ((mx - xLow) / (xHigh - xLow)) * CUSTOM_FULL_SIZE;
+  const mapY = (my) => CUSTOM_FULL_SIZE - ((my - yLow) / (yHigh - yLow)) * CUSTOM_FULL_SIZE;
+
+  const fullCanvas = document.createElement('canvas');
+  fullCanvas.width = CUSTOM_FULL_SIZE; fullCanvas.height = CUSTOM_FULL_SIZE;
+  const fctx = fullCanvas.getContext('2d');
+
+  fctx.strokeStyle = '#DC3232';
+  fctx.lineWidth = 3;
+  fctx.lineCap = 'round';
+  fctx.lineJoin = 'round';
+
+  for (const segment of smoothedSegments) {
+    if (segment.length < 2) continue;
+    fctx.beginPath();
+    fctx.moveTo(mapX(mercatorX(segment[0].lng)), mapY(mercatorY(segment[0].lat)));
+    for (let i = 1; i < segment.length; i++) {
+      fctx.lineTo(mapX(mercatorX(segment[i].lng)), mapY(mercatorY(segment[i].lat)));
+    }
+    fctx.stroke();
+  }
+
+  const cells = [];
+  for (let row = 0; row < 3; row++) {
+    for (let col = 0; col < 3; col++) {
+      const cell = document.createElement('canvas');
+      cell.width = CUSTOM_CELL_SIZE; cell.height = CUSTOM_CELL_SIZE;
+      const cctx = cell.getContext('2d');
+      cctx.drawImage(fullCanvas, col * CUSTOM_CELL_SIZE, row * CUSTOM_CELL_SIZE, CUSTOM_CELL_SIZE, CUSTOM_CELL_SIZE, 0, 0, CUSTOM_CELL_SIZE, CUSTOM_CELL_SIZE);
+      cells.push(cell.toDataURL('image/png'));
+    }
+  }
+  return cells;
+}
+
+function renderTrackPreview(trackData, canvas) {
+  const size = 300;
+  canvas.width = size; canvas.height = size;
+  const ctx = canvas.getContext('2d');
+  ctx.fillStyle = 'rgba(0,0,0,0.3)';
+  ctx.fillRect(0, 0, size, size);
+
+  let points = trackData;
+  if (trackData && trackData.tracks) {
+    // ParseResult
+    points = [];
+    for (const track of trackData.tracks)
+      for (const seg of track.segments) points.push(...seg);
+  } else if (trackData && trackData.segments) {
+    points = trackData.segments.flat();
+  }
+  const smoothed = smoothSegment(points, 500);
+  if (!smoothed.length) return;
+
+  const xs = smoothed.map(p => mercatorX(p.lng));
+  const ys = smoothed.map(p => mercatorY(p.lat));
+  const xMin = Math.min(...xs), xMax = Math.max(...xs);
+  const yMin = Math.min(...ys), yMax = Math.max(...ys);
+  const xRange = xMax - xMin || 1, yRange = yMax - yMin || 1;
+  const maxRange = Math.max(xRange, yRange);
+  const padX = xRange * 0.1, padY = yRange * 0.1;
+  const xCenter = (xMin + xMax) / 2, yCenter = (yMin + yMax) / 2;
+  const half = maxRange / 2 + Math.max(padX, padY);
+  const xLow = xCenter - half, xHigh = xCenter + half;
+  const yLow = yCenter - half, yHigh = yCenter + half;
+
+  const mapX = (mx) => ((mx - xLow) / (xHigh - xLow)) * size;
+  const mapY = (my) => size - ((my - yLow) / (yHigh - yLow)) * size;
+
+  ctx.strokeStyle = '#DC3232';
+  ctx.lineWidth = 1.5;
+  ctx.lineCap = 'round';
+  ctx.beginPath();
+  ctx.moveTo(mapX(mercatorX(smoothed[0].lng)), mapY(mercatorY(smoothed[0].lat)));
+  for (let i = 1; i < smoothed.length; i++) {
+    ctx.lineTo(mapX(mercatorX(smoothed[i].lng)), mapY(mercatorY(smoothed[i].lat)));
+  }
+  ctx.stroke();
+
+  if (smoothed.length > 1) {
+    ctx.fillStyle = '#4CAF50';
+    ctx.beginPath();
+    ctx.arc(mapX(mercatorX(smoothed[0].lng)), mapY(mercatorY(smoothed[0].lat)), 3, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = '#F44336';
+    ctx.beginPath();
+    ctx.arc(mapX(mercatorX(smoothed[smoothed.length-1].lng)), mapY(mercatorY(smoothed[smoothed.length-1].lat)), 3, 0, Math.PI * 2);
+    ctx.fill();
+  }
+}
+
+// ==================== 模板创建 UI ====================
+
+let pendingTrackPoints = null;
+let pendingTemplateName = '';
+let createMapInstance = null;
+
+// ==================== 路线投稿 ====================
+
+let miniMapInstance = null;
+
+function openUploadDialog() {
+  document.getElementById('createFileInput').click();
+}
+
+// 拖拽上传到主界面
+document.getElementById('uploadPanel').addEventListener('dragover', e => { e.preventDefault(); });
+document.getElementById('uploadPanel').addEventListener('drop', e => {
+  e.preventDefault();
+  const files = Array.from(e.dataTransfer.files).filter(f =>
+    /\.(gpx|kml|kmz|geojson|json|tcx|fit)$/i.test(f.name)
+  );
+  if (files[0]) processCreateFile(files[0]);
+});
+
+// 投稿表单
+function openSubmitModal() {
+  document.getElementById('submitModal').classList.add('show');
+  document.getElementById('submitTitle').value = '';
+  document.getElementById('submitDesc').value = '';
+  document.getElementById('titleCount').textContent = '0';
+  document.getElementById('descCount').textContent = '0';
+  document.getElementById('submitMsg').textContent = '';
+  document.getElementById('submitMsg').className = 'modal-msg';
+  scheduleGlassRender();
+}
+
+function closeSubmitModal() {
+  document.getElementById('submitModal').classList.remove('show');
+}
+
+document.getElementById('submitModal').addEventListener('click', e => {
+  if (e.target === e.currentTarget) closeSubmitModal();
+});
+
+// 字数统计
+document.getElementById('submitTitle').addEventListener('input', function() {
+  document.getElementById('titleCount').textContent = this.value.trim().length;
+});
+document.getElementById('submitDesc').addEventListener('input', function() {
+  document.getElementById('descCount').textContent = this.value.trim().length;
+});
+
+// 提交
+async function submitRoute() {
+  if (!pendingTrackPoints) return;
+  const msg = document.getElementById('submitMsg');
+  const title = document.getElementById('submitTitle').value.trim();
+  const desc = document.getElementById('submitDesc').value.trim();
+
+  if (!document.getElementById('agreeTerms').checked) { msg.textContent = '请先同意数据归属条款'; msg.className = 'modal-msg error'; return; }
+  if (title.length < 3) { msg.textContent = '标题不能少于 3 个字'; msg.className = 'modal-msg error'; return; }
+  if (desc.length < 15) { msg.textContent = '正文不能少于 15 个字'; msg.className = 'modal-msg error'; return; }
+
+  msg.textContent = '正在提交...';
+  msg.className = 'modal-msg';
+
+  setTimeout(async () => {
+    try {
+      const cells = renderTemplateCells(pendingTrackPoints);
+      let key = toTemplateFolderName(title);
+      if (!key) { msg.textContent = '标题不能作为文件夹名'; msg.className = 'modal-msg error'; return; }
+      const res = await fetch('/api/submit-route', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ title, description: desc, name: title, key, cells, keepDuplicate: true }),
+      });
+      const data = await res.json();
+      if (!data.ok) { msg.textContent = data.error; msg.className = 'modal-msg error'; return; }
+      msg.textContent = data.name && data.name !== key ? `${data.message}（已保留为：${data.name}）` : data.message;
+      msg.className = 'modal-msg success';
+      setTimeout(() => { closeSubmitModal(); document.getElementById('floatSubmitBtn').style.display = 'none'; }, 2000);
+    } catch (e) { msg.textContent = '提交失败'; msg.className = 'modal-msg error'; }
+  }, 100);
+}
+
+// 文件上传处理
+function handleCreateFile(event) {
+  if (event.target.files[0]) processTrackFile(event.target.files[0]);
+}
+
+// 轨迹文件处理（统一入口）
+async function processTrackFile(file) {
+  const info = document.getElementById('trackInfo');
+  info.textContent = '解析中...';
+
+  const result = await parseTrackFile(file);
+  if (!result) { info.textContent = '无法识别文件格式'; info.style.color = '#ef4444'; return; }
+
+  pendingTrackPoints = smoothSegment(result.points, 500);
+  info.textContent = `${result.format} · ${result.points.length} 个坐标点`;
+
+  // 埋点：轨迹文件上传成功
+  window._tracker?.sendEvent('upload_success', {
+    format: result.format,
+    points_count: result.points.length,
+    interpolated_points: pendingTrackPoints.length,
+  });
+  info.style.color = '';
+  console.log('[轨迹] 原始点:', result.points.length, '→ 插值后:', pendingTrackPoints.length);
+
+  // 显示预览面板
+  const panel = document.getElementById('trackPreviewPanel');
+  panel.style.display = '';
+
+  // 初始化 mini map
+  setTimeout(() => {
+    const mapEl = document.getElementById('miniMap');
+    if (!miniMapInstance && mapEl) {
+      miniMapInstance = L.map(mapEl, { attributionControl: false, zoomControl: false });
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 18 }).addTo(miniMapInstance);
+    }
+    if (miniMapInstance) {
+      miniMapInstance.invalidateSize();
+      miniMapInstance.eachLayer(l => { if (l instanceof L.Polyline || l instanceof L.CircleMarker) miniMapInstance.removeLayer(l); });
+      const latlngs = pendingTrackPoints.map(p => [p.lat, p.lng]);
+      L.polyline(latlngs, { color: '#fb923c', weight: 2.5, opacity: 0.9 }).addTo(miniMapInstance);
+      miniMapInstance.fitBounds(L.latLngBounds(latlngs).pad(0.05));
+    }
+  }, 300);
+
+  // 自动添加到模板列表
+  const tplKey = 'uploaded_track';
+  const tplName = file.name.replace(/\.[^.]+$/, '') || '我的路线';
+  templates[tplKey] = { name: tplName, cells: renderTemplateCells(pendingTrackPoints), category: 'cycling', isCustom: true, isUploaded: true };
+  renderTemplateList();
+  selectTemplate(tplKey);
+
+  // 显示浮动投稿按钮
+  document.getElementById('floatSubmitBtn').style.display = 'flex';
+  scheduleGlassRender();
+}
+
+// 本地保存模板
+function saveCreatedTemplate() {
+  if (!pendingTrackPoints) return;
+  const key = 'custom_' + Date.now();
+  const cells = renderTemplateCells(pendingTrackPoints);
+  const name = '自定义模板 ' + new Date().toLocaleTimeString('zh-CN');
+  templates[key] = { name, cells, isCustom: true };
+
+  const customList = getCustomTemplateList();
+  customList.push({ key, name, cells });
+  try { localStorage.setItem('custom_templates', JSON.stringify(customList)); } catch (e) {}
+  renderTemplateList();
+  selectTemplate(key);
+}
+
+function getCustomTemplateList() {
+  try { return JSON.parse(localStorage.getItem('custom_templates')) || []; }
+  catch (e) { return []; }
+}
+
+function loadCustomTemplates() {
+  for (const item of getCustomTemplateList()) {
+    if (item.key && item.cells && item.cells.length === 9) {
+      templates[item.key] = { name: item.name, cells: item.cells, isCustom: true };
+    }
+  }
+}
+
+async function loadServerTemplates() {
+  try {
+    const res = await fetch('/api/templates');
+    const data = await res.json();
+    for (const t of data.templates) {
+      templates[t.tkey] = { name: t.name, category: t.category || 'cycling', isServer: true };
+    }
+  } catch (e) {}
+}
+
+// 更新 renderTemplateList 以支持自定义模板（cells = base64）
+// 自定义模板没有预置的 grid_2_2.png，用第一格作为缩略图
+
+// ==================== 初始化 ====================
+loadCustomTemplates();
+loadServerTemplates().then(async () => {
+  if (!selectedTemplate || !templates[selectedTemplate]) {
+    selectedTemplate = Object.keys(templates)[0] || '';
+  }
+  renderTemplateList();
+  if (selectedTemplate) await selectTemplate(selectedTemplate);
+});
+renderGrid();
+initDragDrop();
+</script>
+
+<!-- ===== 清空确认弹窗 ===== -->
+<div class="confirm-toast" id="confirmToast">
+  <p>确定清空全部 9 张照片？</p>
+  <div class="toast-btns">
+    <button class="btn btn-ghost" onclick="closeConfirmToast()">取消</button>
+    <button class="btn btn-primary" style="color:#ef4444;border-color:rgba(239,68,68,0.3);background:rgba(239,68,68,0.15);" onclick="doClearAll()">确认清空</button>
+  </div>
+</div>
+
+</body>
+</html>
